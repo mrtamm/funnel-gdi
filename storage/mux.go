@@ -92,6 +92,14 @@ func NewMux(conf config.Config) (*Mux, error) {
 		mux.Backends = append(mux.Backends, ftp)
 	}
 
+	if conf.HTSGETStorage.Valid() {
+		htsget, err := NewHTSGET(conf.HTSGETStorage)
+		if err != nil {
+			return mux, fmt.Errorf("failed to config htsget storage backend: %s", err)
+		}
+		mux.Backends = append(mux.Backends, htsget)
+	}
+
 	return mux, nil
 }
 

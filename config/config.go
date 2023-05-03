@@ -47,6 +47,7 @@ type Config struct {
 	Swift         SwiftStorage
 	HTTPStorage   HTTPStorage
 	FTPStorage    FTPStorage
+	HTSGETStorage HTSGETStorage
 }
 
 // BasicCredential describes a username and password for use with Funnel's basic auth.
@@ -379,6 +380,21 @@ type FTPStorage struct {
 func (h FTPStorage) Valid() bool {
 	return !h.Disabled
 }
+
+// HTSGETStorage configures the http storage backend.
+type HTSGETStorage struct {
+	Disabled bool
+	// Timeout duration for http GET calls
+	Timeout  Duration
+	User     string
+	Password string
+}
+
+// Valid validates the FTPStorage configuration.
+func (h HTSGETStorage) Valid() bool {
+	return !h.Disabled
+}
+
 
 // Kubernetes describes the configuration for the Kubernetes compute backend.
 type Kubernetes struct {
