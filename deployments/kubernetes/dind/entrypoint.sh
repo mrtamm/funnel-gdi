@@ -1,6 +1,8 @@
 #!/bin/sh
 
-(nohup dockerd &) 2> /dev/null
+if [ ! -e /var/run/docker.pid ]; then
+(nohup dockerd --bip 172.128.0.1/16 &) 2> /dev/null
+fi
 
 timeout=20
 while [ ! -f /var/run/docker.pid ]; do

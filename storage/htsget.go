@@ -52,9 +52,13 @@ func (b *HTSGET) Get(ctx context.Context, url, path string) (*Object, error) {
 		}
 		bearer := url[_bearer_start:_bearer_stop]
 		url = "htsget://"+url[_bearer_stop+1:]
-		cmd = exec.Command("htsget", "--bearer-token", bearer, strings.Replace(url, "htsget://", "http://", 1), "--output", path)
+		cmd = exec.Command("htsget", "--bearer-token", bearer, strings.Replace(url, "htsget://", "https://", 1), "--output", path)
+		info := fmt.Sprintf("Running: htsget --bearer-token %s '%s' --output '%s'\n", bearer, strings.Replace(url, "htsget://", "https://", 1), path)
+		f, _ := os.Create("/tmp/storage.log")
+		f.WriteString(info)
+		f.Close()
 	} else {
-		cmd = exec.Command("htsget", strings.Replace(url, "htsget://", "http://", 1), "--output", path)
+		cmd = exec.Command("htsget", strings.Replace(url, "htsget://", "https://", 1), "--output", path)
 	}
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
