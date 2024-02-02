@@ -22,6 +22,7 @@ import (
 func NewClient(address string) (*Client, error) {
 	user := os.Getenv("FUNNEL_SERVER_USER")
 	password := os.Getenv("FUNNEL_SERVER_PASSWORD")
+	bearer := os.Getenv("FUNNEL_SERVER_BEARER")
 
 	re := regexp.MustCompile("^(.+://)?(.[^/]+)(.+)?$")
 	endpoint := re.ReplaceAllString(address, "$1$2")
@@ -43,6 +44,7 @@ func NewClient(address string) (*Client, error) {
 		Marshaler: &Marshaler,
 		User:      user,
 		Password:  password,
+		Bearer:    bearer,
 	}, nil
 }
 
@@ -53,6 +55,15 @@ type Client struct {
 	Marshaler *jsonpb.Marshaler
 	User      string
 	Password  string
+	Bearer    string
+}
+
+func (c *Client) setAuth(hreq *http.Request) {
+	if c.User != "" && c.Password != "" {
+		hreq.SetBasicAuth(c.User, c.Password)
+	} else if c.Bearer != "" {
+		hreq.Header.Set("Authorization", "Bearer "+c.Bearer)
+	}
 }
 
 // GetTask returns the raw bytes from GET /v1/tasks/{id}
@@ -61,7 +72,7 @@ func (c *Client) GetTask(ctx context.Context, req *GetTaskRequest) (*Task, error
 	u := c.address + "/v1/tasks/" + req.Id + "?view=" + req.View.String()
 	hreq, _ := http.NewRequest("GET", u, nil)
 	hreq.WithContext(ctx)
-	hreq.SetBasicAuth(c.User, c.Password)
+	c.setAuth(hreq)
 	body, err := util.CheckHTTPResponse(c.client.Do(hreq))
 	if err != nil {
 		return nil, err
@@ -95,7 +106,7 @@ func (c *Client) ListTasks(ctx context.Context, req *ListTasksRequest) (*ListTas
 	u := c.address + "/v1/tasks?" + v.Encode()
 	hreq, _ := http.NewRequest("GET", u, nil)
 	hreq.WithContext(ctx)
-	hreq.SetBasicAuth(c.User, c.Password)
+	c.setAuth(hreq)
 	body, err := util.CheckHTTPResponse(c.client.Do(hreq))
 	if err != nil {
 		return nil, err
@@ -127,7 +138,7 @@ func (c *Client) CreateTask(ctx context.Context, task *Task) (*CreateTaskRespons
 	hreq, _ := http.NewRequest("POST", u, &b)
 	hreq.WithContext(ctx)
 	hreq.Header.Add("Content-Type", "application/json")
-	hreq.SetBasicAuth(c.User, c.Password)
+	c.setAuth(hreq)
 	body, err := util.CheckHTTPResponse(c.client.Do(hreq))
 	if err != nil {
 		return nil, err
@@ -148,7 +159,7 @@ func (c *Client) CancelTask(ctx context.Context, req *CancelTaskRequest) (*Cance
 	hreq, _ := http.NewRequest("POST", u, nil)
 	hreq.WithContext(ctx)
 	hreq.Header.Add("Content-Type", "application/json")
-	hreq.SetBasicAuth(c.User, c.Password)
+	c.setAuth(hreq)
 	body, err := util.CheckHTTPResponse(c.client.Do(hreq))
 	if err != nil {
 		return nil, err
@@ -168,7 +179,7 @@ func (c *Client) GetServiceInfo(ctx context.Context, req *ServiceInfoRequest) (*
 	u := c.address + "/v1/tasks/service-info"
 	hreq, _ := http.NewRequest("GET", u, nil)
 	hreq.WithContext(ctx)
-	hreq.SetBasicAuth(c.User, c.Password)
+	c.setAuth(hreq)
 	body, err := util.CheckHTTPResponse(c.client.Do(hreq))
 	if err != nil {
 		return nil, err

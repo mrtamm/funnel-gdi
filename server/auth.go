@@ -9,11 +9,21 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
-// Return a new interceptor function that authorizes RPCs
-// using a password stored in the config.
-func newAuthInterceptor(creds []config.BasicCredential) grpc.UnaryServerInterceptor {
+var (
+	errMissingMetadata    = status.Errorf(codes.InvalidArgument, "Missing metadata in the context")
+	errTokenRequired      = status.Errorf(codes.Unauthenticated, "Bearer/Basic authorization token missing")
+	errInvalidBasicToken  = status.Errorf(codes.Unauthenticated, "Invalid Basic authorization token")
+	errInvalidBearerToken = status.Errorf(codes.Unauthenticated, "Invalid Bearer authorization token")
+)
+
+// Return a new interceptor function that authorizes RPCs.
+func newAuthInterceptor(creds []config.BasicCredential, oidc config.OidcAuth) grpc.UnaryServerInterceptor {
+	basicCreds := initBasicCredsMap(creds)
+	oidcConfig := initOidcConfig(oidc)
+	requireAuth := len(basicCreds) > 0 || oidcConfig != nil
 
 	// Return a function that is the interceptor.
 	return func(
@@ -21,65 +31,49 @@ func newAuthInterceptor(creds []config.BasicCredential) grpc.UnaryServerIntercep
 		req interface{},
 		info *grpc.UnaryServerInfo,
 		handler grpc.UnaryHandler) (interface{}, error) {
-		var authorized bool
-		var err error
-		for _, cred := range creds {
-			err = authorize(ctx, cred.User, cred.Password)
-			if err == nil {
-				authorized = true
-			}
+
+		if !requireAuth {
+			return handler(ctx, req)
 		}
-		if len(creds) == 0 {
-			authorized = true
+
+		md, ok := metadata.FromIncomingContext(ctx)
+		if !ok {
+			return nil, errMissingMetadata
 		}
+
+		values := md["authorization"]
+		if len(values) < 1 {
+			return nil, errTokenRequired
+		}
+
+		authorized := false
+		auth_err := errTokenRequired
+
+		if strings.HasPrefix(values[0], "Basic ") {
+			auth_err = errInvalidBasicToken
+			authorized = basicCreds[values[0]]
+		} else if oidcConfig != nil && strings.HasPrefix(values[0], "Bearer ") {
+			auth_err = errInvalidBearerToken
+			jwtString := strings.TrimPrefix(values[0], "Bearer ")
+			jwt := oidcConfig.ParseJwt(jwtString)
+			authorized = jwt != nil
+		}
+
 		if !authorized {
-			return nil, err
+			return nil, auth_err
 		}
+
 		return handler(ctx, req)
 	}
 }
 
-// Check the context's metadata for the configured server/API password.
-func authorize(ctx context.Context, user, password string) error {
-	if md, ok := metadata.FromIncomingContext(ctx); ok {
-		if len(md["authorization"]) > 0 {
-			raw := md["authorization"][0]
-			requser, reqpass, ok := parseBasicAuth(raw)
-			if ok {
-				if requser == user && reqpass == password {
-					return nil
-				}
-				return grpc.Errorf(codes.PermissionDenied, "")
-			}
-		}
+func initBasicCredsMap(creds []config.BasicCredential) map[string]bool {
+	basicCreds := make(map[string]bool)
+	for _, cred := range creds {
+		credBytes := []byte(cred.User + ":" + cred.Password)
+		fullValue := "Basic " + base64.StdEncoding.EncodeToString(credBytes)
+		basicCreds[fullValue] = true
 	}
 
-	return grpc.Errorf(codes.Unauthenticated, "")
-}
-
-// parseBasicAuth parses an HTTP Basic Authentication string.
-// "Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==" returns ("Aladdin", "open sesame", true).
-//
-// Taken from Go core: https://golang.org/src/net/http/request.go?s=27379:27445#L828
-func parseBasicAuth(auth string) (username, password string, ok bool) {
-	const prefix = "Basic "
-
-	if !strings.HasPrefix(auth, prefix) {
-		return
-	}
-
-	c, err := base64.StdEncoding.DecodeString(auth[len(prefix):])
-
-	if err != nil {
-		return
-	}
-
-	cs := string(c)
-	s := strings.IndexByte(cs, ':')
-
-	if s < 0 {
-		return
-	}
-
-	return cs[:s], cs[s+1:], true
+	return basicCreds
 }
