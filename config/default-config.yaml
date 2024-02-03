@@ -42,8 +42,6 @@ Server:
   # OidcAuth:
   #   # URL of the OIDC service configuration:
   #   ServiceConfigUrl: ""
-  #   ClientId: ""
-  #   ClientSecret: ""
   #   # Optional: if specified, this scope value must be in the token:
   #   RequireScope:
   #   # Optional: if specified, this audience value must be in the token:

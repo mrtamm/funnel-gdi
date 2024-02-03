@@ -2,6 +2,8 @@ package util
 
 import (
 	"io/ioutil"
+	"log"
+	"math/rand"
 	"os"
 	"path/filepath"
 
@@ -34,6 +36,22 @@ func MergeConfigFileWithFlags(file string, flagConf config.Config) (config.Confi
 		}
 	}
 
+	// Make sure that User/Password are defined for conf.RPCClient:
+	// 1) when conf.Server.BasicAuth has credentials
+	// 2) when conf.Server.OidcAuth is enabled (clients still need to provide Basic credentials)
+	if conf.RPCClient.User == "" && conf.RPCClient.Password == "" {
+		if len(conf.Server.BasicAuth) > 0 {
+			log.Fatal("RPCClient User and Password are undefined while Server.BasicAuth is enabled.")
+		} else if conf.Server.OidcAuth.ServiceConfigUrl != "" {
+			// Generating random user/password credentials for RPC:
+			conf.RPCClient.User = randomCredential()
+			conf.RPCClient.Password = randomCredential()
+			conf.Server.BasicAuth = append(conf.Server.BasicAuth, config.BasicCredential{
+				User:     conf.RPCClient.User,
+				Password: conf.RPCClient.Password,
+			})
+		}
+	}
 	return conf, nil
 }
 
@@ -57,4 +75,14 @@ func TempConfigFile(c config.Config, name string) (path string, cleanup func()) 
 		panic(err)
 	}
 	return p, cleanup
+}
+
+// RandomString generates a random string of length 20.
+func randomCredential() string {
+	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz0123456789")
+	b := make([]rune, 20)
+	for i := range b {
+		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+	}
+	return string(b)
 }

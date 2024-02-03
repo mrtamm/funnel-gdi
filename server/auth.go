@@ -14,7 +14,7 @@ import (
 
 var (
 	errMissingMetadata    = status.Errorf(codes.InvalidArgument, "Missing metadata in the context")
-	errTokenRequired      = status.Errorf(codes.Unauthenticated, "Bearer/Basic authorization token missing")
+	errTokenRequired      = status.Errorf(codes.Unauthenticated, "Basic/Bearer authorization token missing")
 	errInvalidBasicToken  = status.Errorf(codes.Unauthenticated, "Invalid Basic authorization token")
 	errInvalidBearerToken = status.Errorf(codes.Unauthenticated, "Invalid Bearer authorization token")
 )

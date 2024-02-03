@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -30,9 +31,7 @@ type OidcConfig struct {
 }
 
 func initOidcConfig(config config.OidcAuth) *OidcConfig {
-	if config.ServiceConfigUrl == "" ||
-		config.ClientId == "" ||
-		config.ClientSecret == "" {
+	if config.ServiceConfigUrl == "" {
 		return nil
 	}
 
@@ -85,6 +84,11 @@ func (c *OidcConfig) ParseJwt(jwtString string) *jwt.Token {
 		jwt.WithIssuer(c.remote.Issuer),
 	)
 
+	if err != nil {
+		fmt.Println("Token is not valid.", err)
+		return nil
+	}
+
 	// If audience is required, it must be in the token.
 	if c.local.RequireAudience != "" {
 		found := false
@@ -95,6 +99,7 @@ func (c *OidcConfig) ParseJwt(jwtString string) *jwt.Token {
 			}
 		}
 		if !found {
+			fmt.Printf("Audience [%s] not found in %v.", c.local.RequireAudience, token.Audience())
 			return nil
 		}
 	}
@@ -112,6 +117,7 @@ func (c *OidcConfig) ParseJwt(jwtString string) *jwt.Token {
 			}
 		}
 		if !found {
+			fmt.Printf("Scope [%s] not found in [%s]", c.local.RequireScope, value)
 			return nil
 		}
 	}
