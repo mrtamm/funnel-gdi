@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -45,8 +45,9 @@ func (c *OidcConfig) initConfig() {
 	parsedUrl := validateUrl(c.local.ServiceConfigUrl)
 	err := json.Unmarshal(fetchJson(parsedUrl), &c.remote)
 	if err != nil {
-		log.Fatalf("Failed to parse the configuration (JSON) of the OIDC "+
-			"service: %s", err)
+		fmt.Printf("[ERROR] Failed to parse the configuration (JSON) of the "+
+			"OIDC service: %s\n", err)
+		os.Exit(1)
 	}
 
 	c.initJwks()
@@ -58,22 +59,23 @@ func (c *OidcConfig) initJwks() {
 
 	// Define JWKS cache:
 	c.jwks = *jwk.NewCache(ctx)
-	c.jwks.Register(jwksUrl, jwk.WithMinRefreshInterval(1*time.Hour))
+	c.jwks.Register(jwksUrl, jwk.WithMinRefreshInterval(15*time.Minute))
 
 	// Init JWKS cache:
 	ctx2, _ := context.WithTimeout(ctx, 10*time.Second)
 	_, err := c.jwks.Refresh(ctx2, jwksUrl)
 
 	if err != nil {
-		log.Fatalf("Failed to fetch JWKS (%s) of the OIDC service (%s).",
-			jwksUrl, c.local.ServiceConfigUrl, err)
+		fmt.Printf("[ERROR] Failed to fetch JWKS (%s) of the OIDC service "+
+			"(%s): %s\n", jwksUrl, c.local.ServiceConfigUrl, err)
+		os.Exit(1)
 	}
 }
 
 func (c *OidcConfig) ParseJwt(jwtString string) *jwt.Token {
 	keySet, err := c.jwks.Get(context.Background(), c.remote.JwksURI)
 	if err != nil {
-		log.Println("Failed to retrieve JWKS key-set.", err)
+		fmt.Printf("[WARN] Failed to retrieve JWKS key-set: %s", err)
 		return nil
 	}
 
@@ -85,7 +87,7 @@ func (c *OidcConfig) ParseJwt(jwtString string) *jwt.Token {
 	)
 
 	if err != nil {
-		fmt.Println("Token is not valid.", err)
+		fmt.Printf("[WARN] Provided JWT is not valid: %s.\n", err)
 		return nil
 	}
 
@@ -99,7 +101,8 @@ func (c *OidcConfig) ParseJwt(jwtString string) *jwt.Token {
 			}
 		}
 		if !found {
-			fmt.Printf("Audience [%s] not found in %v.", c.local.RequireAudience, token.Audience())
+			fmt.Printf("[WARN] Audience [%s] not found in %v.",
+				c.local.RequireAudience, token.Audience())
 			return nil
 		}
 	}
@@ -117,7 +120,8 @@ func (c *OidcConfig) ParseJwt(jwtString string) *jwt.Token {
 			}
 		}
 		if !found {
-			fmt.Printf("Scope [%s] not found in [%s]", c.local.RequireScope, value)
+			fmt.Printf("[WARN] Scope [%s] not found in [%s]",
+				c.local.RequireScope, value)
 			return nil
 		}
 	}
@@ -128,9 +132,13 @@ func (c *OidcConfig) ParseJwt(jwtString string) *jwt.Token {
 func validateUrl(providedUrl string) *url.URL {
 	parsedUrl, err := url.ParseRequestURI(providedUrl)
 	if err != nil {
-		log.Fatalf("OIDC configuration URL (%s) could not be parsed.", parsedUrl, err)
+		fmt.Printf("[ERROR] OIDC configuration URL (%s) could not be "+
+			"parsed: %s\n", parsedUrl, err)
+		os.Exit(1)
 	} else if parsedUrl.Scheme == "" || parsedUrl.Host == "" {
-		log.Fatalf("OIDC configuration URL (%s) is not absolute.", parsedUrl)
+		fmt.Printf("[ERROR] OIDC configuration URL (%s) is not absolute.",
+			parsedUrl)
+		os.Exit(1)
 	}
 	return parsedUrl
 }
@@ -139,19 +147,25 @@ func fetchJson(url *url.URL) []byte {
 	res, err := http.Get(url.String())
 
 	if err != nil {
-		log.Fatal("OIDC service configuration could not be loaded", err)
+		fmt.Printf("[ERROR] OIDC service configuration (%s) could not be "+
+			"loaded: %s.\n", url.String(), err)
+		os.Exit(1)
 	} else if res.StatusCode != 200 {
-		log.Fatalf("OIDC service configuration could not be loaded (HTTP "+
-			" response status: %d)", res.StatusCode)
+		fmt.Printf("[ERROR] OIDC service configuration (%s) could not be "+
+			"loaded (HTTP response status: %d).", url.String(), res.StatusCode)
+		os.Exit(1)
 	} else if res.Body == nil {
-		log.Fatal("OIDC service configuration could not be loaded (empty " +
-			"response)")
+		fmt.Printf("[ERROR] OIDC service configuration (%s) could not be "+
+			"loaded (empty response).\n", url.String())
+		os.Exit(1)
 	}
 
 	defer res.Body.Close()
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		log.Fatal("Failed to read the body of the OIDC configuration response", err)
+		fmt.Printf("[ERROR] Failed to read the body of the OIDC "+
+			"configuration (%s) response: %s\n", url.String(), err)
+		os.Exit(1)
 	}
 
 	return body

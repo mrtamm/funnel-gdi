@@ -1,8 +1,8 @@
 package util
 
 import (
+	"fmt"
 	"io/ioutil"
-	"log"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -41,7 +41,9 @@ func MergeConfigFileWithFlags(file string, flagConf config.Config) (config.Confi
 	// 2) when conf.Server.OidcAuth is enabled (clients still need to provide Basic credentials)
 	if conf.RPCClient.User == "" && conf.RPCClient.Password == "" {
 		if len(conf.Server.BasicAuth) > 0 {
-			log.Fatal("RPCClient User and Password are undefined while Server.BasicAuth is enabled.")
+			fmt.Println("Configuration problem: RPCClient User and Password " +
+				"are undefined while Server.BasicAuth is enforeced.")
+			os.Exit(1)
 		} else if conf.Server.OidcAuth.ServiceConfigUrl != "" {
 			// Generating random user/password credentials for RPC:
 			conf.RPCClient.User = randomCredential()
