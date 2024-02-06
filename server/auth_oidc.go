@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"os"
 	"strings"
@@ -188,12 +187,6 @@ func (c *OidcConfig) isJwtActive(token string) bool {
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusOK {
-			byteDump, err := httputil.DumpResponse(response, true)
-			if err != nil {
-				fmt.Printf("Failed to dump response: %s\n", err)
-			} else {
-				fmt.Print(string(byteDump))
-			}
 			fmt.Printf("[WARN] JWT introspection call gave non-200 HTTP status %d "+
 				"(thus JWT not active)\n", response.StatusCode)
 			return false
