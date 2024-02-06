@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"strings"
@@ -18,9 +19,14 @@ import (
 
 // JSON structure of the OIDC configuration (only some fields)
 type OidcRemoteConfig struct {
-	Issuer           string `json:"issuer"`
-	UserinfoEndpoint string `json:"userinfo_endpoint"`
-	JwksURI          string `json:"jwks_uri"`
+	Issuer                string `json:"issuer"`
+	JwksURI               string `json:"jwks_uri"`
+	IntrospectionEndpoint string `json:"introspection_endpoint"`
+}
+
+// JSON structure of the OIDC token introspection response (only some fields)
+type IntrospectionResponse struct {
+	Active bool `json:"active"`
 }
 
 // OIDC configuration structure used for validating input from request.
@@ -91,10 +97,18 @@ func (c *OidcConfig) ParseJwt(jwtString string) *jwt.Token {
 		return nil
 	}
 
+	if !c.isJwtValid(&token) || !c.isJwtActive(jwtString) {
+		return nil
+	}
+
+	return &token
+}
+
+func (c *OidcConfig) isJwtValid(token *jwt.Token) bool {
 	// If audience is required, it must be in the token.
 	if c.local.RequireAudience != "" {
 		found := false
-		for _, value := range token.Audience() {
+		for _, value := range (*token).Audience() {
 			if value == c.local.RequireAudience {
 				found = true
 				break
@@ -102,14 +116,14 @@ func (c *OidcConfig) ParseJwt(jwtString string) *jwt.Token {
 		}
 		if !found {
 			fmt.Printf("[WARN] Audience [%s] not found in %v.",
-				c.local.RequireAudience, token.Audience())
-			return nil
+				c.local.RequireAudience, (*token).Audience())
+			return false
 		}
 	}
 
 	// If scope is required, it must be in the token.
 	if c.local.RequireScope != "" {
-		value, found := token.Get("scope")
+		value, found := (*token).Get("scope")
 		if found {
 			found = false
 			for _, value := range strings.Split(value.(string), " ") {
@@ -122,11 +136,100 @@ func (c *OidcConfig) ParseJwt(jwtString string) *jwt.Token {
 		if !found {
 			fmt.Printf("[WARN] Scope [%s] not found in [%s]",
 				c.local.RequireScope, value)
-			return nil
+			return false
 		}
 	}
 
-	return &token
+	return true
+}
+
+func (c *OidcConfig) isJwtActive(token string) bool {
+	if c.remote.IntrospectionEndpoint == "" {
+		fmt.Println("[WARN] JWT introspection endpoint was not defined in the OIDC " +
+			"(remote) configuration; therefore assuming that the token is active.")
+		return true
+	}
+
+	client := &http.Client{}
+	params := url.Values{"token": {token}}.Encode()
+	attemptsCount := 3
+
+	for attemptsCount > 0 {
+		request, err := http.NewRequest(
+			http.MethodPost,
+			c.remote.IntrospectionEndpoint,
+			strings.NewReader(params))
+
+		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+		if c.local.ClientId != "" && c.local.ClientSecret != "" {
+			request.SetBasicAuth(c.local.ClientId, c.local.ClientSecret)
+		} else {
+			fmt.Println("[WARN] Requesting token introspection without " +
+				"client credentials (unspecified in the config)")
+		}
+
+		response, err := client.Do(request)
+
+		if err != nil {
+			fmt.Printf("[ERROR] Failed to call OIDC introspection endpoint "+
+				"(POST %s): %s\n", c.remote.IntrospectionEndpoint, err)
+			if attemptsCount > 1 {
+				fmt.Println("Trying to call OIDC introspection endpoint again after a second...")
+				time.Sleep(1 * time.Second)
+			} else {
+				fmt.Println("[ERROR] Too many failed attempts for JWT " +
+					"introspection. Giving up.")
+			}
+			attemptsCount--
+			continue
+		}
+
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			byteDump, err := httputil.DumpResponse(response, true)
+			if err != nil {
+				fmt.Printf("Failed to dump response: %s\n", err)
+			} else {
+				fmt.Print(string(byteDump))
+			}
+			fmt.Printf("[WARN] JWT introspection call gave non-200 HTTP status %d "+
+				"(thus JWT not active)\n", response.StatusCode)
+			return false
+		}
+
+		body, err := io.ReadAll(response.Body)
+
+		if err != nil {
+			fmt.Printf("[WARN] Failed to read JWT introspection response "+
+				"body with HTTP status %d (thus JWT not active): %s\n",
+				response.StatusCode, err)
+			return false
+		}
+
+		if !strings.HasPrefix(response.Header.Get("Content-Type"), "application/json") {
+			fmt.Printf("[WARN] JWT introspection endpoint returned non-JSON "+
+				"[content-type=%s] HTTP 200 response (thus JWT not active): %s\n",
+				response.Header.Get("Content-Type"), body)
+			return false
+		}
+
+		if len(body) == 0 {
+			fmt.Println("[WARN] JWT introspection endpoint returned empty " +
+				"HTTP 200 response (thus JWT not active)")
+			return false
+		}
+
+		var result IntrospectionResponse
+		if err := json.Unmarshal(body, &result); err != nil {
+			fmt.Printf("Cannot unmarshal JSON from the JWT introspection endpoint: %s", err)
+		}
+
+		return result.Active
+	}
+
+	return false
 }
 
 func validateUrl(providedUrl string) *url.URL {
@@ -150,7 +253,7 @@ func fetchJson(url *url.URL) []byte {
 		fmt.Printf("[ERROR] OIDC service configuration (%s) could not be "+
 			"loaded: %s.\n", url.String(), err)
 		os.Exit(1)
-	} else if res.StatusCode != 200 {
+	} else if res.StatusCode != http.StatusOK {
 		fmt.Printf("[ERROR] OIDC service configuration (%s) could not be "+
 			"loaded (HTTP response status: %d).", url.String(), res.StatusCode)
 		os.Exit(1)

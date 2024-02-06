@@ -13,7 +13,10 @@ JWT in the request.
 
 Funnel itself does not redirect users to perform the login.
 It just validates that the presented token is issued by a trusted service
-(specified in the configuration file) and the token has not expired.
+(specified in the YAML configuration file) and the token has not expired.
+In addition, if the OIDC provides a token introspection endpoint (in its
+configuration JSON), Funnel server also calls that endpoint to make sure the
+token is still active (i.e., no token invalidation before expiring).
 
 Optionally, Funnel can also validate the scope and audience claims to contain
 specific values.
@@ -25,8 +28,15 @@ Server:
   OidcAuth:
     # URL of the OIDC service configuration:
     ServiceConfigUrl: "https://my.oidc.service/.well-known/openid-configuration"
+
+    # Client ID and secret are sent with the token introspection request 
+    # (Basic authentication):
+    ClientId: your-client-id
+    ClientSecret: your-client-secret
+
     # Optional: if specified, this scope value must be in the token:
     RequireScope: funnel-id
+
     # Optional: if specified, this audience value must be in the token:
     RequireAudience: tes-api
 ```

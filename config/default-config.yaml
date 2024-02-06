@@ -42,6 +42,10 @@ Server:
   # OidcAuth:
   #   # URL of the OIDC service configuration:
   #   ServiceConfigUrl: ""
+  #   # Client ID and secret are sent with the token introspection request 
+  #   # (Basic authentication):
+  #   ClientId:
+  #   ClientSecret:
   #   # Optional: if specified, this scope value must be in the token:
   #   RequireScope:
   #   # Optional: if specified, this audience value must be in the token:

@@ -58,6 +58,8 @@ type BasicCredential struct {
 
 type OidcAuth struct {
 	ServiceConfigUrl string
+	ClientId         string
+	ClientSecret     string
 	RequireScope     string
 	RequireAudience  string
 }
