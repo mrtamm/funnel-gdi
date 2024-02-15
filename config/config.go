@@ -56,6 +56,14 @@ type BasicCredential struct {
 	Password string
 }
 
+type OidcAuth struct {
+	ServiceConfigUrl string
+	ClientId         string
+	ClientSecret     string
+	RequireScope     string
+	RequireAudience  string
+}
+
 // RPCClient describes configuration for gRPC clients
 type RPCClient struct {
 	BasicCredential
@@ -77,6 +85,7 @@ type Server struct {
 	HTTPPort         string
 	RPCPort          string
 	BasicAuth        []BasicCredential
+	OidcAuth         OidcAuth
 	DisableHTTPCache bool
 }
 
@@ -394,7 +403,6 @@ type HTSGETStorage struct {
 func (h HTSGETStorage) Valid() bool {
 	return !h.Disabled
 }
-
 
 // Kubernetes describes the configuration for the Kubernetes compute backend.
 type Kubernetes struct {

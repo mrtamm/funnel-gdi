@@ -33,26 +33,26 @@ func TestBasicAuthFail(t *testing.T) {
 		Id:   "1",
 		View: tes.TaskView_MINIMAL,
 	})
-	if err == nil || !strings.Contains(err.Error(), "STATUS CODE - 403") {
+	if err == nil || !strings.Contains(err.Error(), "STATUS CODE - 401") {
 		t.Fatal("expected error")
 	}
 
 	_, err = fun.HTTP.ListTasks(ctx, &tes.ListTasksRequest{
 		View: tes.TaskView_MINIMAL,
 	})
-	if err == nil || !strings.Contains(err.Error(), "STATUS CODE - 403") {
+	if err == nil || !strings.Contains(err.Error(), "STATUS CODE - 401") {
 		t.Fatal("expected error")
 	}
 
 	_, err = fun.HTTP.CreateTask(ctx, extask)
-	if err == nil || !strings.Contains(err.Error(), "STATUS CODE - 403") {
+	if err == nil || !strings.Contains(err.Error(), "STATUS CODE - 401") {
 		t.Fatal("expected error")
 	}
 
 	_, err = fun.HTTP.CancelTask(ctx, &tes.CancelTaskRequest{
 		Id: "1",
 	})
-	if err == nil || !strings.Contains(err.Error(), "STATUS CODE - 403") {
+	if err == nil || !strings.Contains(err.Error(), "STATUS CODE - 401") {
 		t.Fatal("expected error")
 	}
 
@@ -61,26 +61,26 @@ func TestBasicAuthFail(t *testing.T) {
 		Id:   "1",
 		View: tes.TaskView_MINIMAL,
 	})
-	if err == nil || !strings.Contains(err.Error(), "PermissionDenied") {
+	if err == nil || !strings.Contains(err.Error(), "Unauthenticated") {
 		t.Fatal("expected error")
 	}
 
 	_, err = fun.RPC.ListTasks(ctx, &tes.ListTasksRequest{
 		View: tes.TaskView_MINIMAL,
 	})
-	if err == nil || !strings.Contains(err.Error(), "PermissionDenied") {
+	if err == nil || !strings.Contains(err.Error(), "Unauthenticated") {
 		t.Fatal("expected error")
 	}
 
 	_, err = fun.RPC.CreateTask(ctx, tests.HelloWorld())
-	if err == nil || !strings.Contains(err.Error(), "PermissionDenied") {
+	if err == nil || !strings.Contains(err.Error(), "Unauthenticated") {
 		t.Fatal("expected error")
 	}
 
 	_, err = fun.RPC.CancelTask(ctx, &tes.CancelTaskRequest{
 		Id: "1",
 	})
-	if err == nil || !strings.Contains(err.Error(), "PermissionDenied") {
+	if err == nil || !strings.Contains(err.Error(), "Unauthenticated") {
 		t.Fatal("expected error")
 	}
 

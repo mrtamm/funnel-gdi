@@ -26,6 +26,7 @@ type Server struct {
 	RPCAddress       string
 	HTTPPort         string
 	BasicAuth        []config.BasicCredential
+	OidcAuth         config.OidcAuth
 	Tasks            tes.TaskServiceServer
 	Events           events.EventServiceServer
 	Nodes            scheduler.SchedulerServiceServer
@@ -68,7 +69,7 @@ func (s *Server) Serve(pctx context.Context) error {
 		grpc.UnaryInterceptor(
 			grpc_middleware.ChainUnaryServer(
 				// API auth check.
-				newAuthInterceptor(s.BasicAuth),
+				newAuthInterceptor(s.BasicAuth, s.OidcAuth),
 				newDebugInterceptor(s.Log),
 			),
 		),

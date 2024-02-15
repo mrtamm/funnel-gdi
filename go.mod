@@ -38,6 +38,7 @@ require (
 	github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/kr/pretty v0.3.1
+	github.com/lestrrat-go/jwx/v2 v2.0.19 // indirect
 	github.com/logrusorgru/aurora v0.0.0-20200102142835-e9ef32dff381
 	github.com/maruel/panicparse v1.3.0 // indirect
 	github.com/mattn/go-runewidth v0.0.8 // indirect
@@ -59,8 +60,8 @@ require (
 	github.com/smartystreets/goconvey v1.6.4 // indirect
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.8.3
-	golang.org/x/crypto v0.14.0
+	github.com/stretchr/testify v1.8.4
+	golang.org/x/crypto v0.17.0
 	golang.org/x/net v0.17.0
 	golang.org/x/oauth2 v0.8.0
 	golang.org/x/time v0.3.0
