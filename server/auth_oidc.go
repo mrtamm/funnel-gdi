@@ -159,6 +159,13 @@ func (c *OidcConfig) isJwtActive(token string) bool {
 			c.remote.IntrospectionEndpoint,
 			strings.NewReader(params))
 
+		if err != nil {
+			fmt.Printf("[ERROR] Failed to create a new request for the OIDC "+
+				"introspection endpoint (POST %s): %s\n",
+				c.remote.IntrospectionEndpoint, err)
+			return false
+		}
+
 		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 		if c.local.ClientId != "" && c.local.ClientSecret != "" {
