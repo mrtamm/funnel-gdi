@@ -54,7 +54,7 @@ func TestGoogleStorageAnonymousGet(t *testing.T) {
 
 	store := &GoogleCloud{svc}
 
-	_, err = store.Get(context.Background(), "gs://uspto-pair/applications/05900016.zip", "_test_download/05900016.zip")
+	_, err = store.Get(context.Background(), "gs://gatk-test-data/1kgp/downsampled_gvcf_hg37/1kg-50-exome.txt", "_test_download/file.txt")
 	if err != nil {
 		t.Error("Error downloading file:", err)
 	}
