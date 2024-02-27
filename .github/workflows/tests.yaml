@@ -12,12 +12,10 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: 1.21
-          cache: false
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v4
         with:
           version: v1.56.2
-          skip-cache: true
           args: --skip-dirs tests --modules-download-mode mod --timeout 10m --verbose
 
   build:
@@ -63,8 +61,6 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: funnelBin
-    - name: Display structure of downloaded files
-      run: ls -R
     - name: MongoTest
       run: |
         chmod +x funnel
