@@ -18,7 +18,7 @@ jobs:
         with:
           version: v1.56.2
           skip-cache: true
-          args: --skip-dirs tests --timeout 10m --verbose
+          args: --skip-dirs tests --modules-download-mode mod --timeout 10m --verbose
 
   build:
     runs-on: ubuntu-latest
