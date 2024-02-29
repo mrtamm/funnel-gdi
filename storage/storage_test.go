@@ -22,6 +22,7 @@ func TestStorageWithConfig(t *testing.T) {
 		Swift:         config.SwiftStorage{Disabled: true},
 		HTTPStorage:   config.HTTPStorage{Disabled: true},
 		FTPStorage:    config.FTPStorage{Disabled: true},
+		HTSGETStorage: config.HTSGETStorage{Disabled: true},
 	}
 
 	sc, err := NewMux(c)
@@ -65,7 +66,8 @@ func TestStorageWithConfig(t *testing.T) {
 			TenantID:   "faketenantid",
 			RegionName: "fakeregion",
 		},
-		HTTPStorage: config.HTTPStorage{Disabled: false},
+		HTTPStorage:   config.HTTPStorage{Disabled: false},
+		HTSGETStorage: config.HTSGETStorage{Disabled: true},
 	}
 	sc, err = NewMux(c)
 	if err != nil {

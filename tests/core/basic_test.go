@@ -280,9 +280,10 @@ func TestGetTaskView(t *testing.T) {
 }
 
 // TODO this is a bit hacky for now because we're reusing the same
-//      server + DB for all the e2e tests, so ListTasks gets the
-//      results of all of those. It works for the moment, but
-//      should probably run against a clean environment.
+//
+//	server + DB for all the e2e tests, so ListTasks gets the
+//	results of all of those. It works for the moment, but
+//	should probably run against a clean environment.
 func TestListTaskView(t *testing.T) {
 	tests.SetLogOutput(log, t)
 	var tasks []*tes.Task
@@ -526,7 +527,7 @@ func TestSingleCharLog(t *testing.T) {
 	time.Sleep(time.Second * 5)
 	task := fun.Get(id)
 	if task.Logs[0].Logs[0].Stdout != "a\n" {
-		t.Fatal("Missing logs")
+		t.Fatalf("Missing logs - got char bytes: %v\n", []byte(task.Logs[0].Logs[0].Stdout))
 	}
 	fun.Cancel(id)
 }
