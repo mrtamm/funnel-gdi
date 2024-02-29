@@ -4,16 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 
-	"github.com/golang/protobuf/jsonpb"
 	cmdutil "github.com/ohsu-comp-bio/funnel/cmd/util"
 	"github.com/ohsu-comp-bio/funnel/config"
 	"github.com/ohsu-comp-bio/funnel/logger"
 	"github.com/ohsu-comp-bio/funnel/storage"
 	"github.com/ohsu-comp-bio/funnel/tes"
 	"github.com/spf13/cobra"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 var log = logger.NewLogger("storage", logger.DefaultConfig())
@@ -90,45 +89,39 @@ func NewCommand() *cobra.Command {
 				return fmt.Errorf("creating storage clients: %s", err)
 			}
 
-			f, err := os.Open(args[0])
+			data, err := os.ReadFile(args[0])
 			if err != nil {
 				return fmt.Errorf("opening task file: %s", err)
 			}
-			defer f.Close()
 
-			dec := json.NewDecoder(f)
-			for {
-				task := &tes.Task{}
-				err := jsonpb.UnmarshalNext(dec, task)
-				if err == io.EOF {
-					break
-				}
+			task := &tes.Task{}
+			err = protojson.Unmarshal(data, task)
+
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: %s\n", err)
+				return err
+			}
+
+			for _, in := range task.Inputs {
+				obj, err := store.Stat(context.Background(), in.Url)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "error: %s\n", err)
 					continue
 				}
 
-				for _, in := range task.Inputs {
-					obj, err := store.Stat(context.Background(), in.Url)
-					if err != nil {
-						fmt.Fprintf(os.Stderr, "error: %s\n", err)
-						continue
-					}
+				b, _ := json.Marshal(obj)
+				fmt.Println(string(b))
+			}
 
-					b, _ := json.Marshal(obj)
-					fmt.Println(string(b))
+			for _, out := range task.Outputs {
+				obj, err := store.Stat(context.Background(), out.Url)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error: %s\n", err)
+					continue
 				}
 
-				for _, out := range task.Outputs {
-					obj, err := store.Stat(context.Background(), out.Url)
-					if err != nil {
-						fmt.Fprintf(os.Stderr, "error: %s\n", err)
-						continue
-					}
-
-					b, _ := json.Marshal(obj)
-					fmt.Println(string(b))
-				}
+				b, _ := json.Marshal(obj)
+				fmt.Println(string(b))
 			}
 
 			return nil

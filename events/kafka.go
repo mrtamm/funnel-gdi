@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/Shopify/sarama"
 	"github.com/ohsu-comp-bio/funnel/config"
@@ -77,12 +78,16 @@ func NewKafkaReader(ctx context.Context, conf config.Kafka, w Writer) (*KafkaRea
 	go func() {
 		for msg := range p.Messages() {
 			ev := &Event{}
-			err := Unmarshal(msg.Value, ev)
-			if err != nil {
-				// TODO
+
+			if err := Unmarshal(msg.Value, ev); err != nil {
+				fmt.Printf("Error detected while unmarshaling Kafka event message data: %s\n", err)
 				continue
 			}
-			w.WriteEvent(context.Background(), ev)
+
+			if err := w.WriteEvent(context.Background(), ev); err != nil {
+				fmt.Printf("Error detected while writing Kafka event: %s\n", err)
+				continue
+			}
 		}
 	}()
 

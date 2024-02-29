@@ -99,15 +99,20 @@ func (b *Backend) Submit(task *tes.Task) error {
 
 	resp, err := b.client.SubmitJob(req)
 	if err != nil {
-		b.event.WriteEvent(ctx, events.NewState(task.Id, tes.SystemError))
-		b.event.WriteEvent(
-			ctx,
-			events.NewSystemLog(
-				task.Id, 0, 0, "error",
-				"error submitting task to AWSBatch",
-				map[string]string{"error": err.Error()},
-			),
+		if err2 := b.event.WriteEvent(ctx, events.NewState(task.Id, tes.SystemError)); err2 != nil {
+			b.log.Error("Detected error while writing SystemError event", err2)
+		}
+
+		sl := events.NewSystemLog(
+			task.Id, 0, 0, "error",
+			"error submitting task to AWSBatch",
+			map[string]string{"error": err.Error()},
 		)
+
+		if err2 := b.event.WriteEvent(ctx, sl); err2 != nil {
+			b.log.Error("Detected error while writing SystemLog event", err2)
+		}
+
 		return err
 	}
 
@@ -213,15 +218,19 @@ ReconcileLoop:
 						jstate := *j.Status
 
 						if jstate == "FAILED" {
-							b.event.WriteEvent(ctx, events.NewState(task.Id, tes.SystemError))
-							b.event.WriteEvent(
-								ctx,
-								events.NewSystemLog(
-									task.Id, 0, 0, "error",
-									"AWSBatch job in FAILED state",
-									map[string]string{"error": *j.StatusReason, "awsbatch_id": *j.JobId},
-								),
+							if err2 := b.event.WriteEvent(ctx, events.NewState(task.Id, tes.SystemError)); err2 != nil {
+								b.log.Error("Detected error while writing SystemError event", err2)
+							}
+
+							sl := events.NewSystemLog(
+								task.Id, 0, 0, "error",
+								"AWSBatch job in FAILED state",
+								map[string]string{"error": *j.StatusReason, "awsbatch_id": *j.JobId},
 							)
+
+							if err2 := b.event.WriteEvent(ctx, sl); err2 != nil {
+								b.log.Error("Detected error while writing SystemLog event", err2)
+							}
 						}
 					}
 

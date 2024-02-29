@@ -3,6 +3,7 @@ package local
 
 import (
 	"context"
+	"fmt"
 
 	workerCmd "github.com/ohsu-comp-bio/funnel/cmd/worker"
 	"github.com/ohsu-comp-bio/funnel/config"
@@ -47,7 +48,9 @@ func (b *Backend) Submit(task *tes.Task) error {
 	}
 
 	go func() {
-		w.Run(ctx)
+		if err := w.Run(ctx); err != nil {
+			fmt.Printf("Detected error while submitting a task: %s\n", err)
+		}
 		w.Close()
 	}()
 	return nil

@@ -11,7 +11,9 @@ Node:
     DiskGb: 50.0
 `
 	conf := Config{}
-	Parse([]byte(yaml), &conf)
+	if err := Parse([]byte(yaml), &conf); err != nil {
+		t.Error(err)
+	}
 
 	if conf.Node.Resources.Cpus != 42 {
 		t.Fatal("unexpected cpus")

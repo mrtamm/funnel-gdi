@@ -1,33 +1,33 @@
 package tes
 
 import (
-	"bytes"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/getlantern/deepcopy"
-	"github.com/golang/protobuf/jsonpb"
 	"github.com/rs/xid"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // Marshaler marshals tasks to indented JSON.
-var Marshaler = jsonpb.Marshaler{
+var Marshaler = protojson.MarshalOptions{
 	Indent: "  ",
 }
+var Unmarshaler = protojson.UnmarshalOptions{}
 
 // MarshalToString marshals a task to an indented JSON string.
 func MarshalToString(t *Task) (string, error) {
 	if t == nil {
 		return "", fmt.Errorf("can't marshal nil task")
 	}
-	return Marshaler.MarshalToString(t)
+	return Marshaler.Format(t), nil
 }
 
 // Base64Encode encodes a task as a base64 encoded string
 func Base64Encode(t *Task) (string, error) {
-	str, err := Marshaler.MarshalToString(t)
+	str, err := MarshalToString(t)
 	if err != nil {
 		return "", err
 	}
@@ -42,8 +42,7 @@ func Base64Decode(raw string) (*Task, error) {
 		return nil, fmt.Errorf("decoding task: %v", err)
 	}
 	task := &Task{}
-	buf := bytes.NewBuffer(data)
-	err = jsonpb.Unmarshal(buf, task)
+	err = protojson.Unmarshal(data, task)
 	if err != nil {
 		return nil, fmt.Errorf("unmarshaling task: %v", err)
 	}
@@ -107,7 +106,9 @@ func TerminalState(s State) bool {
 // GetBasicView returns the basic view of a task.
 func (task *Task) GetBasicView() *Task {
 	view := &Task{}
-	deepcopy.Copy(view, task)
+	if err := deepcopy.Copy(view, task); err != nil {
+		fmt.Printf("Error detected while copying task data: %v", err)
+	}
 
 	// remove contents from inputs
 	for _, v := range view.Inputs {

@@ -314,71 +314,6 @@ func (db *DynamoDB) createTaskInputContent(ctx context.Context, task *tes.Task) 
 	return nil
 }
 
-func (db *DynamoDB) deleteTask(ctx context.Context, id string) error {
-	var item *dynamodb.DeleteItemInput
-	var err error
-
-	item = &dynamodb.DeleteItemInput{
-		TableName: aws.String(db.taskTable),
-		Key: map[string]*dynamodb.AttributeValue{
-			db.partitionKey: {
-				S: aws.String(db.partitionValue),
-			},
-			"id": {
-				S: aws.String(id),
-			},
-		},
-	}
-	_, err = db.client.DeleteItemWithContext(ctx, item)
-	if err != nil {
-		return err
-	}
-
-	query := &dynamodb.QueryInput{
-		TableName:              aws.String(db.contentTable),
-		Limit:                  aws.Int64(10),
-		ScanIndexForward:       aws.Bool(false),
-		ConsistentRead:         aws.Bool(true),
-		KeyConditionExpression: aws.String("id = :v1"),
-		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
-			":v1": {
-				S: aws.String(id),
-			},
-		},
-		ExpressionAttributeNames: map[string]*string{
-			"#index": aws.String("index"),
-		},
-		ProjectionExpression: aws.String("id, #index"),
-	}
-
-	err = db.client.QueryPagesWithContext(
-		ctx,
-		query,
-		func(page *dynamodb.QueryOutput, lastPage bool) bool {
-			for _, res := range page.Items {
-				item = &dynamodb.DeleteItemInput{
-					TableName: aws.String(db.contentTable),
-					Key: map[string]*dynamodb.AttributeValue{
-						"id":    res["id"],
-						"index": res["index"],
-					},
-				}
-				// TODO handle error
-				db.client.DeleteItem(item)
-			}
-			if page.LastEvaluatedKey == nil {
-				return false
-			}
-			return true
-		})
-
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (db *DynamoDB) getMinimalView(ctx context.Context, id string) (*dynamodb.GetItemOutput, error) {
 	item := &dynamodb.GetItemInput{
 		TableName: aws.String(db.taskTable),
@@ -474,10 +409,7 @@ func (db *DynamoDB) getContent(ctx context.Context, in map[string]*dynamodb.Attr
 				i, _ := strconv.ParseInt(*item["index"].N, 10, 64)
 				in["inputs"].L[i].M["content"] = item["content"]
 			}
-			if page.LastEvaluatedKey == nil {
-				return false
-			}
-			return true
+			return page.LastEvaluatedKey != nil
 		},
 	)
 	if err != nil {
@@ -511,10 +443,7 @@ func (db *DynamoDB) getExecutorOutput(ctx context.Context, in map[string]*dynamo
 					}
 				}
 			}
-			if page.LastEvaluatedKey == nil {
-				return false
-			}
-			return true
+			return page.LastEvaluatedKey != nil
 		},
 	)
 	if err != nil {
@@ -543,10 +472,7 @@ func (db *DynamoDB) getSystemLogs(ctx context.Context, in map[string]*dynamodb.A
 				i, _ := strconv.ParseInt(*item["attempt"].N, 10, 64)
 				in["logs"].L[i].M["system_logs"] = item["system_logs"]
 			}
-			if page.LastEvaluatedKey == nil {
-				return false
-			}
-			return true
+			return page.LastEvaluatedKey != nil
 		},
 	)
 	if err != nil {

@@ -19,19 +19,19 @@ import (
 // sequential process of task initialization, execution, finalization,
 // and logging.
 type DefaultWorker struct {
-	Executor       Executor
-	Conf           config.Worker
-	Store          storage.Storage
-	TaskReader     TaskReader
-	EventWriter    events.Writer
+	Executor    Executor
+	Conf        config.Worker
+	Store       storage.Storage
+	TaskReader  TaskReader
+	EventWriter events.Writer
 }
 
 // Configuration of the task executor.
 type Executor struct {
 	// "docker" or "kubernetes"
-	Backend   string
+	Backend string
 	// Kubernetes executor template
-	Template  string
+	Template string
 	// Kubernetes namespace
 	Namespace string
 }
@@ -59,10 +59,16 @@ func (r *DefaultWorker) Run(pctx context.Context) (runerr error) {
 	// TODO if we failed to retrieve the task, we can't do anything useful.
 	//      but, it's also difficult to report the failure usefully.
 	if run.syserr != nil {
-		r.EventWriter.WriteEvent(pctx, events.NewSystemLog("unknown", 0, 0, "error",
+		sl := events.NewSystemLog("unknown", 0, 0, "error",
 			"failed to get task. ID unknown", map[string]string{
 				"error": run.syserr.Error(),
-			}))
+			})
+
+		if err2 := r.EventWriter.WriteEvent(pctx, sl); err2 != nil {
+			fmt.Printf("Detected error while writing SystemLog event "+
+				"about failing to retrieve the task: %s\n", err2)
+		}
+
 		runerr = run.syserr
 		return
 	}
@@ -106,7 +112,10 @@ func (r *DefaultWorker) Run(pctx context.Context) (runerr error) {
 
 		// cleanup workdir
 		if !r.Conf.LeaveWorkDir {
-			mapper.Cleanup()
+			if err := mapper.Cleanup(); err != nil {
+				fmt.Printf("Detected error while cleaning up [%s]: %s\n",
+					mapper.WorkDir, err)
+			}
 		}
 	}()
 
@@ -146,19 +155,19 @@ func (r *DefaultWorker) Run(pctx context.Context) (runerr error) {
 	if run.ok() {
 		for i, d := range task.GetExecutors() {
 			var command = Command{
-				Image:         d.Image,
-				ShellCommand:  d.Command,
-				Volumes:       mapper.Volumes,
-				Workdir:       d.Workdir,
-				Env:           d.Env,
-				Event:         event.NewExecutorWriter(uint32(i)),
+				Image:        d.Image,
+				ShellCommand: d.Command,
+				Volumes:      mapper.Volumes,
+				Workdir:      d.Workdir,
+				Env:          d.Env,
+				Event:        event.NewExecutorWriter(uint32(i)),
 			}
 
 			var taskCommand TaskCommand
 			if r.Executor.Backend == "kubernetes" {
 				taskCommand = &KubernetesCommand{
 					TaskId:       task.Id,
-					JobId:        i, 
+					JobId:        i,
 					StdinFile:    d.Stdin,
 					TaskTemplate: r.Executor.Template,
 					Namespace:    r.Executor.Namespace,
@@ -167,16 +176,16 @@ func (r *DefaultWorker) Run(pctx context.Context) (runerr error) {
 				}
 			} else {
 				taskCommand = &DockerCommand{
-					ContainerName:   fmt.Sprintf("%s-%d", task.Id, i),
+					ContainerName: fmt.Sprintf("%s-%d", task.Id, i),
 					//TODO Make RemoveContainer configurable
-				 	RemoveContainer: true,
+					RemoveContainer: true,
 					Command:         command,
 				}
 			}
 
 			s := &stepWorker{
-				Conf:  r.Conf,
-				Event: event.NewExecutorWriter(uint32(i)),
+				Conf:    r.Conf,
+				Event:   event.NewExecutorWriter(uint32(i)),
 				Command: taskCommand,
 			}
 

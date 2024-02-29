@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"strings"
-        "os/exec"
 	"os"
+	"os/exec"
+	"strings"
+
 	"github.com/ohsu-comp-bio/funnel/config"
 )
 
@@ -22,21 +23,21 @@ func NewHTSGET(conf config.HTSGETStorage) (*HTSGET, error) {
 
 // Join a directory URL with a subpath.
 func (b *HTSGET) Join(url, path string) (string, error) {
-        return "", nil
+	return "", nil
 }
 
 // Stat returns information about the object at the given storage URL.
 func (b *HTSGET) Stat(ctx context.Context, url string) (*Object, error) {
-        return nil, nil
+	return nil, nil
 }
 
 // List a directory. Calling List on a File is an error.
 func (b *HTSGET) List(ctx context.Context, url string) ([]*Object, error) {
-        return nil, nil
+	return nil, nil
 }
 
 func (b *HTSGET) Put(ctx context.Context, url, path string) (*Object, error) {
-        return nil, nil
+	return nil, nil
 }
 
 // Get copies a file from a given URL to the host path.
@@ -51,7 +52,7 @@ func (b *HTSGET) Get(ctx context.Context, url, path string) (*Object, error) {
 			return nil, fmt.Errorf("Bearer token not terminated by @")
 		}
 		bearer := url[_bearer_start:_bearer_stop]
-		url = "htsget://"+url[_bearer_stop+1:]
+		url = "htsget://" + url[_bearer_stop+1:]
 		cmd = exec.Command("htsget", "--bearer-token", bearer, strings.Replace(url, "htsget://", "https://", 1), "--output", path)
 	} else {
 		cmd = exec.Command("htsget", strings.Replace(url, "htsget://", "https://", 1), "--output", path)
@@ -67,10 +68,10 @@ func (b *HTSGET) Get(ctx context.Context, url, path string) (*Object, error) {
 		return nil, err
 	}
 	return &Object{
-		URL:	      url,
+		URL:          url,
 		Size:         info.Size(),
 		LastModified: info.ModTime(),
-		Name:	      path,
+		Name:         path,
 	}, nil
 }
 
@@ -82,27 +83,17 @@ func (b *HTSGET) UnsupportedOperations(url string) UnsupportedOperations {
 	}
 
 	ops := UnsupportedOperations{
-                List: fmt.Errorf("htsgetStorage: List operation is not supported"),
-                Put:  fmt.Errorf("htsgetStorage: Put operation is not supported"),
+		List: fmt.Errorf("htsgetStorage: List operation is not supported"),
+		Put:  fmt.Errorf("htsgetStorage: Put operation is not supported"),
 		Join: fmt.Errorf("htsgetStorage: Join operation is not supported"),
 		Stat: fmt.Errorf("htsgetStorage: Stat operation is not supported"),
-        }
+	}
 	return ops
 }
 
 func (b *HTSGET) supportsPrefix(url string) error {
-	if !strings.HasPrefix(url, "htsget://")  {
+	if !strings.HasPrefix(url, "htsget://") {
 		return &ErrUnsupportedProtocol{"htsgetStorage"}
 	}
 	return nil
-}
-
-// htsgetclient exists implements the storage API and reuses an HTSGET client
-// for recursive calls.
-type htsgetclient struct {
-}
-
-// Get copies a file from a given URL to the host path.
-func (b *htsgetclient) Get(ctx context.Context, url, path string) (*Object, error) {
-	return nil, nil
 }

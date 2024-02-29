@@ -37,22 +37,16 @@ build:
 
 # Generate the protobuf/gRPC code
 proto:
-	@cd tes && protoc \
+	@protoc \
 		$(PROTO_INC) \
-		--go_out=plugins=grpc:. \
-		--grpc-gateway_out=logtostderr=true:. \
-		tes.proto
-	@cd compute/scheduler && protoc \
-		$(PROTO_INC) \
-		--go_out=plugins=grpc:. \
-		--grpc-gateway_out=logtostderr=true:. \
-		scheduler.proto
-	@cd events && protoc \
-		$(PROTO_INC) \
-		-I ../tes \
-		--go_out=Mtes.proto=github.com/ohsu-comp-bio/funnel/tes,plugins=grpc:. \
-		--grpc-gateway_out=logtostderr=true:. \
-		events.proto
+		--go_out=. --go_opt=paths=source_relative \
+		--go-grpc_out=require_unimplemented_servers=false:. --go-grpc_opt=paths=source_relative \
+		--grpc-gateway_out=. \
+	    --grpc-gateway_opt=paths=source_relative \
+    	--grpc-gateway_opt=generate_unbound_methods=true \
+		tes/tes.proto \
+		compute/scheduler/scheduler.proto \
+		events/events.proto
 
 # Start API reference doc server
 serve-doc:

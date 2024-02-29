@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"github.com/ohsu-comp-bio/funnel/config"
 	"github.com/ohsu-comp-bio/funnel/util/fsutil"
 	"golang.org/x/oauth2/google"
+	"google.golang.org/api/option"
 	"google.golang.org/api/storage/v1"
 )
 
@@ -33,7 +33,7 @@ func NewGoogleCloud(conf config.GoogleCloudStorage) (*GoogleCloud, error) {
 	if conf.CredentialsFile != "" {
 		// Pull the client configuration (e.g. auth) from a given account file.
 		// This is likely downloaded from Google Cloud manually via IAM & Admin > Service accounts.
-		bytes, rerr := ioutil.ReadFile(conf.CredentialsFile)
+		bytes, rerr := os.ReadFile(conf.CredentialsFile)
 		if rerr != nil {
 			return nil, rerr
 		}
@@ -52,7 +52,7 @@ func NewGoogleCloud(conf config.GoogleCloudStorage) (*GoogleCloud, error) {
 		}
 	}
 
-	svc, cerr := storage.New(client)
+	svc, cerr := storage.NewService(ctx, option.WithHTTPClient(client))
 	if cerr != nil {
 		return nil, cerr
 	}

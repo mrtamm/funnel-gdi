@@ -5,7 +5,6 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"regexp"
 	"strings"
@@ -58,7 +57,7 @@ func NewAmazonS3(conf config.AmazonS3Storage) (*AmazonS3, error) {
 	}
 
 	if conf.SSE.CustomerKeyFile != "" {
-		key, err := ioutil.ReadFile(conf.SSE.CustomerKeyFile)
+		key, err := os.ReadFile(conf.SSE.CustomerKeyFile)
 		if err != nil {
 			return nil, fmt.Errorf("error reading sse-c file: %v", err)
 		}
@@ -280,7 +279,7 @@ func (s3b *AmazonS3) parse(rawurl string) (*urlparts, string, error) {
 	if s3b.endpoint != "" {
 		path = strings.TrimPrefix(path, s3b.endpoint)
 	} else {
-		re := regexp.MustCompile("^s3.*\\.amazonaws\\.com/")
+		re := regexp.MustCompile(`^s3.*\.amazonaws\.com/`)
 		path = re.ReplaceAllString(path, "")
 	}
 	if path == "" {

@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"time"
 
@@ -39,7 +40,8 @@ func (s *stepWorker) Run(ctx context.Context) error {
 
 	// Capture stdout/err to file.
 	if s.Command.GetStdout() != nil {
-		stdout = io.MultiWriter(s.Command.GetStdout(), stdout) }
+		stdout = io.MultiWriter(s.Command.GetStdout(), stdout)
+	}
 	if s.Command.GetStderr() != nil {
 		stderr = io.MultiWriter(s.Command.GetStderr(), stderr)
 	}
@@ -55,7 +57,9 @@ func (s *stepWorker) Run(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			// Likely the task was canceled.
-			s.Command.Stop()
+			if err := s.Command.Stop(); err != nil {
+				fmt.Printf("Detected error when sending STOP command to a step-worker: %s\n", err)
+			}
 			<-done
 			s.Event.EndTime(time.Now())
 			return ctx.Err()

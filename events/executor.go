@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"time"
 
@@ -81,43 +82,64 @@ func NewExecutorWriter(taskID string, attempt uint32, index uint32, w Writer) *E
 }
 
 // StartTime updates the task's start time log.
-func (ew *ExecutorWriter) StartTime(t time.Time) error {
-	return ew.out.WriteEvent(context.Background(), ew.gen.StartTime(t))
+func (ew *ExecutorWriter) StartTime(t time.Time) {
+	if err := ew.out.WriteEvent(context.Background(), ew.gen.StartTime(t)); err != nil {
+		fmt.Printf("Detected error while writing start-time system log message: %s\n", err)
+		fmt.Printf("Original start-time: %s\n", t)
+	}
 }
 
 // EndTime updates the task's end time log.
-func (ew *ExecutorWriter) EndTime(t time.Time) error {
-	return ew.out.WriteEvent(context.Background(), ew.gen.EndTime(t))
+func (ew *ExecutorWriter) EndTime(t time.Time) {
+	if err := ew.out.WriteEvent(context.Background(), ew.gen.EndTime(t)); err != nil {
+		fmt.Printf("Detected error while writing end-time system log message: %s\n", err)
+		fmt.Printf("Original end-time: %s\n", t)
+	}
 }
 
 // ExitCode updates an executor's exit code log.
-func (ew *ExecutorWriter) ExitCode(x int) error {
-	return ew.out.WriteEvent(context.Background(), ew.gen.ExitCode(x))
+func (ew *ExecutorWriter) ExitCode(x int) {
+	if err := ew.out.WriteEvent(context.Background(), ew.gen.ExitCode(x)); err != nil {
+		fmt.Printf("Detected error while writing exit-code system log message: %s\n", err)
+		fmt.Printf("Original exit-code: %d\n", x)
+	}
 }
 
 // Stdout appends to an executor's stdout log.
-func (ew *ExecutorWriter) Stdout(s string) error {
-	return ew.out.WriteEvent(context.Background(), ew.gen.Stdout(s))
+func (ew *ExecutorWriter) Stdout(s string) {
+	if err := ew.out.WriteEvent(context.Background(), ew.gen.Stdout(s)); err != nil {
+		fmt.Printf("Detected error while writing system log message to STDERR: %s\n", err)
+		fmt.Printf("Original system log message: %s\n", s)
+	}
 }
 
 // Stderr appends to an executor's stderr log.
-func (ew *ExecutorWriter) Stderr(s string) error {
-	return ew.out.WriteEvent(context.Background(), ew.gen.Stderr(s))
+func (ew *ExecutorWriter) Stderr(s string) {
+	if err := ew.out.WriteEvent(context.Background(), ew.gen.Stderr(s)); err != nil {
+		fmt.Printf("Detected error while writing system log message to STDERR: %s\n", err)
+		fmt.Printf("Original system log message: %s\n", s)
+	}
 }
 
 // Info writes an info level system log message.
-func (ew *ExecutorWriter) Info(msg string, args ...interface{}) error {
-	return ew.sys.Info(msg, args...)
+func (ew *ExecutorWriter) Info(msg string, args ...interface{}) {
+	if err := ew.sys.Info(msg, args...); err != nil {
+		fmt.Printf("Detected error while writing info-level system log message: %s\n", err)
+	}
 }
 
 // Debug writes a debug level system log message.
-func (ew *ExecutorWriter) Debug(msg string, args ...interface{}) error {
-	return ew.sys.Debug(msg, args...)
+func (ew *ExecutorWriter) Debug(msg string, args ...interface{}) {
+	if err := ew.sys.Debug(msg, args...); err != nil {
+		fmt.Printf("Detected error while writing debug-level system log message: %s\n", err)
+	}
 }
 
 // Error writes an error level system log message.
-func (ew *ExecutorWriter) Error(msg string, args ...interface{}) error {
-	return ew.sys.Error(msg, args...)
+func (ew *ExecutorWriter) Error(msg string, args ...interface{}) {
+	if err := ew.sys.Error(msg, args...); err != nil {
+		fmt.Printf("Detected error while writing error-level system log message: %s\n", err)
+	}
 }
 
 // LogTail returns stdout/err io.Writers which will track the
@@ -161,8 +183,12 @@ func LogTail(ctx context.Context, taskID string, attempt, index uint32, size int
 
 	go func() {
 		<-ctx.Done()
-		flush(stdoutbuf, Type_EXECUTOR_STDOUT)
-		flush(stdoutbuf, Type_EXECUTOR_STDERR)
+		if err := flush(stdoutbuf, Type_EXECUTOR_STDOUT); err != nil {
+			fmt.Printf("Error detected while writing to STDOUT: %s\n", err)
+		}
+		if err := flush(stdoutbuf, Type_EXECUTOR_STDERR); err != nil {
+			fmt.Printf("Error detected while writing to STDERR: %s\n", err)
+		}
 	}()
 
 	return stdoutbuf, stderrbuf
@@ -232,7 +258,9 @@ func StreamLogTail(ctx context.Context, taskID string, attempt, index uint32, si
 	go func() {
 		for e := range eventch {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-			out.WriteEvent(ctx, e)
+			if err := out.WriteEvent(ctx, e); err != nil {
+				fmt.Printf("Error detected while writing event: %s\n", err)
+			}
 			cancel()
 		}
 	}()
@@ -258,12 +286,16 @@ func StreamLogTail(ctx context.Context, taskID string, attempt, index uint32, si
 					flushboth(immediate)
 				}
 			case b := <-stdoutch:
-				stdoutbuf.Write(b)
+				if _, err := stdoutbuf.Write(b); err != nil {
+					fmt.Printf("Error detected while writing to STDOUT buffer: %s\n", err)
+				}
 				if limiter.Allow() {
 					flushboth(immediate)
 				}
 			case b := <-stderrch:
-				stderrbuf.Write(b)
+				if _, err := stderrbuf.Write(b); err != nil {
+					fmt.Printf("Error detected while writing to STDERR buffer: %s\n", err)
+				}
 				if limiter.Allow() {
 					flushboth(immediate)
 				}

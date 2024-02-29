@@ -1,13 +1,12 @@
 package elastic
 
 import (
-	"bytes"
 	"context"
 
-	"github.com/golang/protobuf/jsonpb"
 	"github.com/ohsu-comp-bio/funnel/events"
 	"github.com/ohsu-comp-bio/funnel/tes"
 	"github.com/ohsu-comp-bio/funnel/util"
+	"google.golang.org/protobuf/encoding/protojson"
 	elastic "gopkg.in/olivere/elastic.v5"
 )
 
@@ -91,8 +90,8 @@ func (es *Elastic) WriteEvent(ctx context.Context, ev *events.Event) error {
 	switch ev.Type {
 	case events.Type_TASK_CREATED:
 		task := ev.GetTask()
-		mar := jsonpb.Marshaler{}
-		s, err := mar.MarshalToString(task)
+		mar := protojson.MarshalOptions{}
+		b, err := mar.Marshal(task)
 		if err != nil {
 			return err
 		}
@@ -101,7 +100,7 @@ func (es *Elastic) WriteEvent(ctx context.Context, ev *events.Event) error {
 			Index(es.taskIndex).
 			Type("task").
 			Id(task.Id).
-			BodyString(s).
+			BodyString(string(b)).
 			Do(ctx)
 		return err
 
@@ -122,7 +121,7 @@ func (es *Elastic) WriteEvent(ctx context.Context, ev *events.Event) error {
 			}
 
 			task := &tes.Task{}
-			err = jsonpb.Unmarshal(bytes.NewReader(*res.Source), task)
+			err = protojson.Unmarshal(*res.Source, task)
 			if err != nil {
 				return err
 			}

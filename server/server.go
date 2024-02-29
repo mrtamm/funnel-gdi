@@ -2,12 +2,13 @@
 package server
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 
 	"github.com/golang/gddo/httputil"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
-	"github.com/grpc-ecosystem/grpc-gateway/runtime"
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/ohsu-comp-bio/funnel/compute/scheduler"
 	"github.com/ohsu-comp-bio/funnel/config"
 	"github.com/ohsu-comp-bio/funnel/events"
@@ -17,6 +18,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // Server represents a Funnel server. The server handles
@@ -76,14 +78,17 @@ func (s *Server) Serve(pctx context.Context) error {
 	)
 
 	dialOpts := []grpc.DialOption{
-		grpc.WithInsecure(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	}
 
 	// Set up HTTP proxy of gRPC API
 	mux := http.NewServeMux()
-	mar := runtime.JSONPb(tes.Marshaler)
+	mar := runtime.JSONPb{
+		MarshalOptions:   tes.Marshaler,
+		UnmarshalOptions: tes.Unmarshaler,
+	}
 	grpcMux := runtime.NewServeMux(runtime.WithMarshalerOption("*/*", &mar))
-	runtime.OtherErrorHandler = s.handleError
+	runtime.WithErrorHandler(s.handleError)
 
 	dashmux := http.NewServeMux()
 	dashmux.Handle("/", webdash.RootHandler())
@@ -164,16 +169,25 @@ func (s *Server) Serve(pctx context.Context) error {
 
 	<-ctx.Done()
 	grpcServer.GracefulStop()
-	httpServer.Shutdown(context.TODO())
+	if err := httpServer.Shutdown(context.TODO()); err != nil {
+		fmt.Printf("Detected error while shutting down HTTP server: %s\n", err)
+	}
 
 	return srverr
 }
 
 // handleError handles errors in the HTTP stack, logging errors, stack traces,
 // and returning an HTTP error code.
-func (s *Server) handleError(w http.ResponseWriter, req *http.Request, err string, code int) {
+func (s *Server) handleError(
+	c context.Context,
+	mux *runtime.ServeMux,
+	m runtime.Marshaler,
+	w http.ResponseWriter,
+	req *http.Request,
+	err error,
+) {
 	s.Log.Error("HTTP handler error", "error", err, "url", req.URL)
-	http.Error(w, err, code)
+	http.Error(w, err.Error(), 500)
 }
 
 // negotiate determines the response type based on request headers and parameters.

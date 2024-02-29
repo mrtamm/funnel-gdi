@@ -19,18 +19,18 @@ import (
 
 // KubernetesCommand is responsible for configuring and running a task in a Kubernetes cluster.
 type KubernetesCommand struct {
-	TaskId          string
-	JobId           int
-	StdinFile       string
-	TaskTemplate    string
-	Namespace       string
-	Resources       *tes.Resources
+	TaskId       string
+	JobId        int
+	StdinFile    string
+	TaskTemplate string
+	Namespace    string
+	Resources    *tes.Resources
 	Command
 }
 
 // Creates a new Kuberntes Job which will run the task.
 func (kcmd KubernetesCommand) Run(ctx context.Context) error {
-	var taskId = kcmd.TaskId 
+	var taskId = kcmd.TaskId
 	tpl, err := template.New(taskId).Parse(kcmd.TaskTemplate)
 
 	if err != nil {
@@ -78,7 +78,7 @@ func (kcmd KubernetesCommand) Run(ctx context.Context) error {
 
 	var client = clientset.BatchV1().Jobs(kcmd.Namespace)
 
-	_ , err = client.Create(ctx, job, metav1.CreateOptions{})
+	_, err = client.Create(ctx, job, metav1.CreateOptions{})
 
 	if err != nil {
 		return fmt.Errorf("creating job: %v", err)
@@ -86,6 +86,10 @@ func (kcmd KubernetesCommand) Run(ctx context.Context) error {
 
 	// Wait until the job finishes
 	watcher, err := client.Watch(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("job-name=%s-%d", taskId, kcmd.JobId)})
+	if err != nil {
+		return err
+	}
+
 	defer watcher.Stop()
 	waitForJobFinnish(ctx, watcher)
 
@@ -96,7 +100,7 @@ func (kcmd KubernetesCommand) Run(ctx context.Context) error {
 
 	for _, v := range pods.Items {
 		req := clientset.CoreV1().Pods(kcmd.Namespace).GetLogs(v.Name, &corev1.PodLogOptions{})
-		podLogs, err := req.Stream(ctx) 
+		podLogs, err := req.Stream(ctx)
 
 		if err != nil {
 			return err
@@ -106,12 +110,15 @@ func (kcmd KubernetesCommand) Run(ctx context.Context) error {
 		buf := new(bytes.Buffer)
 		_, err = io.Copy(buf, podLogs)
 		if err != nil {
-			return err 
+			return err
 		}
 
 		var bytes = buf.Bytes()
-		kcmd.Stdout.Write(bytes)
-    }
+		_, err = kcmd.Stdout.Write(bytes)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }

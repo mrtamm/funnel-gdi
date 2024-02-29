@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/boltdb/bolt"
-	proto "github.com/golang/protobuf/proto"
 	"github.com/ohsu-comp-bio/funnel/tes"
 	"golang.org/x/net/context"
+	"google.golang.org/protobuf/proto"
 )
 
 func getTaskState(tx *bolt.Tx, id string) tes.State {
@@ -36,7 +36,10 @@ func loadBasicTaskView(tx *bolt.Tx, id string, task *tes.Task) error {
 	if b == nil {
 		return tes.ErrNotFound
 	}
-	proto.Unmarshal(b, task)
+	if err := proto.Unmarshal(b, task); err != nil {
+		fmt.Printf("Detected error while unmarshalling task "+
+			"from task-bucket by ID=%s: %s\n", id, err)
+	}
 	loadTaskLogs(tx, task)
 
 	// remove content from inputs
@@ -55,7 +58,10 @@ func loadFullTaskView(tx *bolt.Tx, id string, task *tes.Task) error {
 	if b == nil {
 		return tes.ErrNotFound
 	}
-	proto.Unmarshal(b, task)
+	if err := proto.Unmarshal(b, task); err != nil {
+		fmt.Printf("Detected error while unmarshalling task "+
+			"from task-bucket by ID=%s: %s\n", id, err)
+	}
 	loadTaskLogs(tx, task)
 
 	// Load executor stdout/err
@@ -95,14 +101,21 @@ func loadTaskLogs(tx *bolt.Tx, task *tes.Task) {
 
 	b := tx.Bucket(TasksLog).Get([]byte(task.Id))
 	if b != nil {
-		proto.Unmarshal(b, tasklog)
+		if err := proto.Unmarshal(b, tasklog); err != nil {
+			fmt.Printf("Detected error while unmarshalling task-log "+
+				"from task-logs-bucket by ID=%s: %s\n", task.Id, err)
+		}
 	}
 
 	for i := range task.Executors {
 		o := tx.Bucket(ExecutorLogs).Get([]byte(fmt.Sprint(task.Id, i)))
 		if o != nil {
 			var execlog tes.ExecutorLog
-			proto.Unmarshal(o, &execlog)
+			if err := proto.Unmarshal(o, &execlog); err != nil {
+				fmt.Printf("Detected error while unmarshalling executor log "+
+					"from executor-logs-bucket by ID=%s: %s\n",
+					fmt.Sprint(task.Id, i), err)
+			}
 			tasklog.Logs = append(tasklog.Logs, &execlog)
 		}
 	}
@@ -147,7 +160,7 @@ func (taskBolt *BoltDB) ListTasks(ctx context.Context, req *tes.ListTasksRequest
 	}
 	pageSize := tes.GetPageSize(req.GetPageSize())
 
-	taskBolt.db.View(func(tx *bolt.Tx) error {
+	err := taskBolt.db.View(func(tx *bolt.Tx) error {
 		c := tx.Bucket(TaskBucket).Cursor()
 
 		i := 0
@@ -189,6 +202,10 @@ func (taskBolt *BoltDB) ListTasks(ctx context.Context, req *tes.ListTasksRequest
 		}
 		return nil
 	})
+
+	if err != nil {
+		return nil, err
+	}
 
 	out := tes.ListTasksResponse{
 		Tasks: tasks,

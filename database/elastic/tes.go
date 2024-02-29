@@ -1,12 +1,11 @@
 package elastic
 
 import (
-	"bytes"
 	"fmt"
 
-	"github.com/golang/protobuf/jsonpb"
 	"github.com/ohsu-comp-bio/funnel/tes"
 	"golang.org/x/net/context"
+	"google.golang.org/protobuf/encoding/protojson"
 	elastic "gopkg.in/olivere/elastic.v5"
 )
 
@@ -37,7 +36,7 @@ func (es *Elastic) GetTask(ctx context.Context, req *tes.GetTaskRequest) (*tes.T
 		return nil, err
 	}
 	task := &tes.Task{}
-	err = jsonpb.Unmarshal(bytes.NewReader(*res.Source), task)
+	err = protojson.Unmarshal(*res.Source, task)
 	return task, err
 }
 
@@ -83,7 +82,7 @@ func (es *Elastic) ListTasks(ctx context.Context, req *tes.ListTasksRequest) (*t
 	resp := &tes.ListTasksResponse{}
 	for i, hit := range res.Hits.Hits {
 		t := &tes.Task{}
-		err := jsonpb.Unmarshal(bytes.NewReader(*hit.Source), t)
+		err := protojson.Unmarshal(*hit.Source, t)
 		if err != nil {
 			return nil, err
 		}

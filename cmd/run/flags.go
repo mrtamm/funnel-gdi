@@ -158,7 +158,10 @@ func parseTopLevelArgs(vals *flagVals, args []string) error {
 		shCmd := flags.Args()[0]
 		args = append([]string{"--sh", shCmd}, args...)
 	}
-	parseTaskArgs(vals, args)
+
+	if err = parseTaskArgs(vals, args); err != nil {
+		return err
+	}
 
 	if len(vals.execs) == 0 {
 		return fmt.Errorf("you must specify a command to run")
@@ -170,10 +173,15 @@ func parseTopLevelArgs(vals *flagVals, args []string) error {
 	return nil
 }
 
-func parseTaskArgs(vals *flagVals, args []string) {
+func parseTaskArgs(vals *flagVals, args []string) error {
 	fl := newFlags(vals)
-	fl.Parse(args)
+
+	if err := fl.Parse(args); err != nil {
+		return fmt.Errorf("failed to parse task arguments: %w", err)
+	}
+
 	buildExecs(fl, vals, args)
+	return nil
 }
 
 // Visit flags to determine commands + stdin/out/err
@@ -185,7 +193,7 @@ func parseTaskArgs(vals *flagVals, args []string) {
 func buildExecs(flags *pflag.FlagSet, vals *flagVals, args []string) {
 	vals.execs = nil
 	var exec *executor
-	flags.ParseAll(args, func(f *pflag.Flag, value string) error {
+	err := flags.ParseAll(args, func(f *pflag.Flag, value string) error {
 		switch f.Name {
 		case "sh", "exec":
 			if exec != nil {
@@ -207,6 +215,9 @@ func buildExecs(flags *pflag.FlagSet, vals *flagVals, args []string) {
 		}
 		return nil
 	})
+	if err != nil {
+		fmt.Printf("Failed to parse some flags: %s\n", err)
+	}
 	if exec != nil {
 		vals.execs = append(vals.execs, *exec)
 	}

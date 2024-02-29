@@ -20,7 +20,11 @@ func TestGet(t *testing.T) {
 	}
 
 	cmd.SetArgs([]string{"get", "--view", "MINIMAL", "1", "2"})
-	cmd.Execute()
+	err := cmd.Execute()
+
+	if err != nil {
+		t.Errorf("Command execution failed: %s", err)
+	}
 }
 
 // "get" command should have default view of FULL
@@ -35,7 +39,11 @@ func TestGetDefaultView(t *testing.T) {
 	}
 
 	cmd.SetArgs([]string{"get", "1", "2"})
-	cmd.Execute()
+	err := cmd.Execute()
+
+	if err != nil {
+		t.Errorf("Command execution failed: %s", err)
+	}
 }
 
 func TestList(t *testing.T) {
@@ -49,7 +57,11 @@ func TestList(t *testing.T) {
 	}
 
 	cmd.SetArgs([]string{"list", "--view", "FULL"})
-	cmd.Execute()
+	err := cmd.Execute()
+
+	if err != nil {
+		t.Errorf("Command execution failed: %s", err)
+	}
 }
 
 // Test that the server URL defaults to localhost:8000
@@ -88,19 +100,39 @@ func TestServerDefault(t *testing.T) {
 	}
 
 	cmd.SetArgs([]string{"create", "foo.json"})
-	cmd.Execute()
+	err := cmd.Execute()
+
+	if err != nil {
+		t.Errorf("Command execution failed: %s", err)
+	}
 
 	cmd.SetArgs([]string{"list"})
-	cmd.Execute()
+	err = cmd.Execute()
+
+	if err != nil {
+		t.Errorf("Command execution failed: %s", err)
+	}
 
 	cmd.SetArgs([]string{"get", "1"})
-	cmd.Execute()
+	err = cmd.Execute()
+
+	if err != nil {
+		t.Errorf("Command execution failed: %s", err)
+	}
 
 	cmd.SetArgs([]string{"cancel", "1"})
-	cmd.Execute()
+	err = cmd.Execute()
+
+	if err != nil {
+		t.Errorf("Command execution failed: %s", err)
+	}
 
 	cmd.SetArgs([]string{"wait", "1"})
-	cmd.Execute()
+	err = cmd.Execute()
+
+	if err != nil {
+		t.Errorf("Command execution failed: %s", err)
+	}
 }
 
 // Test that the server URL may be set via a FUNNEL_SERVER environment
@@ -142,19 +174,39 @@ func TestServerEnv(t *testing.T) {
 	}
 
 	cmd.SetArgs([]string{"create", "foo.json"})
-	cmd.Execute()
+	err := cmd.Execute()
+
+	if err != nil {
+		t.Errorf("Command execution failed: %s", err)
+	}
 
 	cmd.SetArgs([]string{"list"})
-	cmd.Execute()
+	err = cmd.Execute()
+
+	if err != nil {
+		t.Errorf("Command execution failed: %s", err)
+	}
 
 	cmd.SetArgs([]string{"get", "1"})
-	cmd.Execute()
+	err = cmd.Execute()
+
+	if err != nil {
+		t.Errorf("Command execution failed: %s", err)
+	}
 
 	cmd.SetArgs([]string{"cancel", "1"})
-	cmd.Execute()
+	err = cmd.Execute()
+
+	if err != nil {
+		t.Errorf("Command execution failed: %s", err)
+	}
 
 	cmd.SetArgs([]string{"wait", "1"})
-	cmd.Execute()
+	err = cmd.Execute()
+
+	if err != nil {
+		t.Errorf("Command execution failed: %s", err)
+	}
 }
 
 // Test that the server flag overrides the FUNNEL_SERVER env var
@@ -196,17 +248,37 @@ func TestServerFlagOverride(t *testing.T) {
 	}
 
 	cmd.SetArgs([]string{"create", "-S", srv, "foo.json"})
-	cmd.Execute()
+	err := cmd.Execute()
+
+	if err != nil {
+		t.Errorf("Command execution failed: %s", err)
+	}
 
 	cmd.SetArgs([]string{"list", "-S", srv})
-	cmd.Execute()
+	err = cmd.Execute()
+
+	if err != nil {
+		t.Errorf("Command execution failed: %s", err)
+	}
 
 	cmd.SetArgs([]string{"get", "-S", srv, "1"})
-	cmd.Execute()
+	err = cmd.Execute()
+
+	if err != nil {
+		t.Errorf("Command execution failed: %s", err)
+	}
 
 	cmd.SetArgs([]string{"cancel", "-S", srv, "1"})
-	cmd.Execute()
+	err = cmd.Execute()
+
+	if err != nil {
+		t.Errorf("Command execution failed: %s", err)
+	}
 
 	cmd.SetArgs([]string{"wait", "-S", srv, "1"})
-	cmd.Execute()
+	err = cmd.Execute()
+
+	if err != nil {
+		t.Errorf("Command execution failed: %s", err)
+	}
 }

@@ -2,6 +2,7 @@ package fsutil
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"time"
 )
@@ -18,7 +19,9 @@ func Reader(ctx context.Context, r io.Reader) io.Reader {
 			SetReadDeadline(time.Time) error
 		}
 		if d, ok := r.(deadliner); ok {
-			d.SetReadDeadline(deadline)
+			if err := d.SetReadDeadline(deadline); err != nil {
+				fmt.Printf("Detected error while setting deadline for io.Reader: %s\n", err)
+			}
 		}
 	}
 	return reader{ctx, r}
@@ -52,7 +55,9 @@ func Writer(ctx context.Context, w io.Writer) io.Writer {
 			SetWriteDeadline(time.Time) error
 		}
 		if d, ok := w.(deadliner); ok {
-			d.SetWriteDeadline(deadline)
+			if err := d.SetWriteDeadline(deadline); err != nil {
+				fmt.Printf("Detected error while setting deadline for io.Writer: %s\n", err)
+			}
 		}
 	}
 	return writer{ctx, w}

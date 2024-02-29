@@ -6,9 +6,9 @@ import (
 	"fmt"
 
 	"github.com/boltdb/bolt"
-	proto "github.com/golang/protobuf/proto"
 	"github.com/ohsu-comp-bio/funnel/events"
 	"github.com/ohsu-comp-bio/funnel/tes"
+	"google.golang.org/protobuf/proto"
 )
 
 // State variables for convenience
@@ -31,14 +31,15 @@ func (taskBolt *BoltDB) WriteEvent(ctx context.Context, req *events.Event) error
 	if req.Type == events.Type_TASK_CREATED {
 		task := req.GetTask()
 		idBytes := []byte(task.Id)
-		taskString, err := proto.Marshal(task)
+		taskBytes, err := proto.Marshal(task)
 		if err != nil {
 			return err
 		}
 		err = taskBolt.db.Update(func(tx *bolt.Tx) error {
-			tx.Bucket(TaskBucket).Put(idBytes, taskString)
-			tx.Bucket(TaskState).Put(idBytes, []byte(tes.State_QUEUED.String()))
-			return nil
+			if err := tx.Bucket(TaskBucket).Put(idBytes, taskBytes); err != nil {
+				return err
+			}
+			return tx.Bucket(TaskState).Put(idBytes, []byte(tes.State_QUEUED.String()))
 		})
 		if err != nil {
 			return fmt.Errorf("error storing task in database: %s", err)
@@ -143,9 +144,12 @@ func (taskBolt *BoltDB) WriteEvent(ctx context.Context, req *events.Event) error
 		}
 
 		err = taskBolt.db.Update(func(tx *bolt.Tx) error {
-			tx.Bucket(SysLogs).Put(idBytes, logbytes)
-			return nil
+			return tx.Bucket(SysLogs).Put(idBytes, logbytes)
 		})
+
+		if err != nil {
+			fmt.Printf("Detected error while updating SysLogs in Bolt [%s]: %s\n", req.Id, err)
+		}
 	}
 
 	return err
@@ -179,20 +183,23 @@ func transitionTaskState(tx *bolt.Tx, id string, target tes.State) error {
 
 	case Canceled, Complete, ExecutorError, SystemError:
 		// Remove from queue
-		tx.Bucket(TasksQueued).Delete(idBytes)
+		if err := tx.Bucket(TasksQueued).Delete(idBytes); err != nil {
+			return err
+		}
 
 	case Running, Initializing:
 		if current != Unknown && current != Queued && current != Initializing {
 			return fmt.Errorf("Unexpected transition from %s to %s", current.String(), target.String())
 		}
-		tx.Bucket(TasksQueued).Delete(idBytes)
+		if err := tx.Bucket(TasksQueued).Delete(idBytes); err != nil {
+			return err
+		}
 
 	default:
 		return fmt.Errorf("Unknown target state: %s", target.String())
 	}
 
-	tx.Bucket(TaskState).Put(idBytes, []byte(target.String()))
-	return nil
+	return tx.Bucket(TaskState).Put(idBytes, []byte(target.String()))
 }
 
 func updateTaskLogs(tx *bolt.Tx, id string, tl *tes.TaskLog) error {

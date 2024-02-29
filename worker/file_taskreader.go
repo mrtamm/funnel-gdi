@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/golang/protobuf/jsonpb"
 	"github.com/ohsu-comp-bio/funnel/tes"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // FileTaskReader provides a TaskReader implementation from a task file.
@@ -18,14 +18,13 @@ type FileTaskReader struct {
 func NewFileTaskReader(path string) (*FileTaskReader, error) {
 	// TODO not sure if it's better to return an error immediately,
 	//      or return an error from Task()
-	fh, err := os.Open(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("opening task file: %v", err)
 	}
-	defer fh.Close()
 
 	task := &tes.Task{}
-	err = jsonpb.Unmarshal(fh, task)
+	err = protojson.Unmarshal(data, task)
 	if err != nil {
 		return nil, fmt.Errorf("unmarshaling task file: %v", err)
 	}

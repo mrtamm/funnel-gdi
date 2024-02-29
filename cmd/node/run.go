@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -25,7 +26,10 @@ func Run(ctx context.Context, conf config.Config, log *logger.Logger) error {
 		if err != nil {
 			return err
 		}
-		w.Run(ctx)
+
+		if err := w.Run(ctx); err != nil {
+			fmt.Printf("Detected error while running a node: %s\n", err)
+		}
 		return nil
 	}
 
@@ -34,9 +38,7 @@ func Run(ctx context.Context, conf config.Config, log *logger.Logger) error {
 		return err
 	}
 
-	runctx, cancel := context.WithCancel(context.Background())
-	runctx = util.SignalContext(ctx, time.Nanosecond, syscall.SIGINT, syscall.SIGTERM)
-	defer cancel()
+	runctx := util.SignalContext(ctx, time.Nanosecond, syscall.SIGINT, syscall.SIGTERM)
 
 	hupsig := make(chan os.Signal, 1)
 	go func() {

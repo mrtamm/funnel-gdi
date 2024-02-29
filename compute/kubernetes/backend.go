@@ -6,7 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"text/template"
 	"time"
 
@@ -27,7 +27,7 @@ import (
 // NewBackend returns a new local Backend instance.
 func NewBackend(ctx context.Context, conf config.Kubernetes, reader tes.ReadOnlyServer, writer events.Writer, log *logger.Logger) (*Backend, error) {
 	if conf.TemplateFile != "" {
-		content, err := ioutil.ReadFile(conf.TemplateFile)
+		content, err := os.ReadFile(conf.TemplateFile)
 		if err != nil {
 			return nil, fmt.Errorf("reading template: %v", err)
 		}
@@ -215,7 +215,7 @@ ReconcileLoop:
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			jobs, err := b.client.List(context.TODO() ,metav1.ListOptions{})
+			jobs, err := b.client.List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
 				b.log.Error("reconcile: listing jobs", err)
 				continue ReconcileLoop
@@ -239,15 +239,21 @@ ReconcileLoop:
 					if err != nil {
 						b.log.Error("reconcile: marshal failed job conditions", "taskID", j.Name, "error", err)
 					}
-					b.event.WriteEvent(ctx, events.NewState(j.Name, tes.SystemError))
-					b.event.WriteEvent(
-						ctx,
-						events.NewSystemLog(
-							j.Name, 0, 0, "error",
-							"Kubernetes job in FAILED state",
-							map[string]string{"error": string(conds)},
-						),
+
+					if err2 := b.event.WriteEvent(ctx, events.NewState(j.Name, tes.SystemError)); err2 != nil {
+						b.log.Error("Detected error while writing SystemError event", err2)
+					}
+
+					sl := events.NewSystemLog(
+						j.Name, 0, 0, "error",
+						"Kubernetes job in FAILED state",
+						map[string]string{"error": string(conds)},
 					)
+
+					if err2 := b.event.WriteEvent(ctx, sl); err2 != nil {
+						b.log.Error("Detected error while writing SystemLog event", err2)
+					}
+
 					if disableCleanup {
 						continue ReconcileLoop
 					}

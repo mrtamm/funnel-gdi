@@ -1,6 +1,7 @@
 package webdash
 
 import (
+	"fmt"
 	"net/http"
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
@@ -24,6 +25,8 @@ func FileServer() http.Handler {
 // RootHandler returns an http handler which always responds with the /index.html file.
 func RootHandler() http.Handler {
 	return http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-		resp.Write(index)
+		if _, err := resp.Write(index); err != nil {
+			fmt.Printf("Detected error while writing HTTP response: %s\n", err)
+		}
 	})
 }

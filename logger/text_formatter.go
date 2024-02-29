@@ -11,16 +11,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/protobuf/jsonpb"
-	"github.com/golang/protobuf/proto"
 	"github.com/kr/pretty"
 	"github.com/logrusorgru/aurora"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 var baseTimestamp = time.Now()
-var jsonmar = jsonpb.Marshaler{
+var jsonmar = protojson.MarshalOptions{
 	Indent: "  ",
 }
 
@@ -32,7 +32,7 @@ type textFormatter struct {
 func checkIfTerminal(w io.Writer) bool {
 	switch v := w.(type) {
 	case *os.File:
-		return terminal.IsTerminal(int(v.Fd()))
+		return term.IsTerminal(int(v.Fd()))
 	default:
 		return false
 	}
@@ -72,7 +72,7 @@ func (f *textFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	case logrus.DebugLevel:
 		levelColor = aurora.MagentaFg
 	case logrus.WarnLevel:
-		levelColor = aurora.BrownFg
+		levelColor = aurora.YellowFg
 	case logrus.ErrorLevel, logrus.FatalLevel, logrus.PanicLevel:
 		levelColor = aurora.RedFg
 	default:
@@ -101,11 +101,11 @@ func (f *textFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 		case float32:
 		case float64:
 		case bool:
-		case proto.Message:
+		case protoreflect.ProtoMessage:
 			if reflect.ValueOf(x).IsNil() {
 				// do nothing
-			} else if s, err := jsonmar.MarshalToString(x); err == nil {
-				v = s
+			} else if b, err := jsonmar.Marshal(x); err == nil {
+				v = string(b)
 			} else {
 				v = pretty.Sprint(x)
 			}
