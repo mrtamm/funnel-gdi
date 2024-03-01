@@ -5,9 +5,10 @@ import (
 	"io"
 	"os"
 
+	"encoding/json"
+
 	"github.com/ohsu-comp-bio/funnel/tes"
 	"golang.org/x/net/context"
-	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // Create runs the "task create" CLI command, connecting to the server,
@@ -20,14 +21,21 @@ func Create(server string, files []string, reader io.Reader, writer io.Writer) e
 	}
 
 	for _, taskFile := range files {
-		data, err := os.ReadFile(taskFile)
+		f, err := os.Open(taskFile)
 		if err != nil {
 			return err
 		}
+		defer f.Close()
+		reader = io.MultiReader(reader, f)
+	}
 
+	dec := json.NewDecoder(reader)
+	for {
 		var task tes.Task
-		err = protojson.Unmarshal(data, &task)
-
+		err := dec.Decode(&task)
+		if err == io.EOF {
+			break
+		}
 		if err != nil {
 			return fmt.Errorf("can't load task: %s", err)
 		}

@@ -23,7 +23,7 @@ func TestStopNode(t *testing.T) {
 	// Start the node:
 	cancel := n.Start()
 
-	var finished chan bool
+	finished := make(chan bool)
 
 	// In the background: stop the node and wait, it will report when done
 	go func() {
@@ -75,7 +75,7 @@ func TestNodeTimeout(t *testing.T) {
 	n.Start()
 
 	// Fail if this test doesn't complete in the given time.
-	var finished chan bool
+	finished := make(chan bool)
 
 	// In the background: wait for the node to exit, it will report when done
 	go func() {

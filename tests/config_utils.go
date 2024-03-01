@@ -90,6 +90,7 @@ func RandomPort() string {
 
 // RandomPortConfig returns a modified config with random HTTP and RPC ports.
 func RandomPortConfig(conf config.Config) config.Config {
+	conf.Server.HostName = "localhost"
 	conf.Server.RPCPort = RandomPort()
 	conf.Server.HTTPPort = RandomPort()
 	conf.RPCClient.ServerAddress = conf.Server.RPCAddress()

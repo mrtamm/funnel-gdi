@@ -20,7 +20,7 @@ func loadTestData(name string) []byte {
 
 func testServer(f http.HandlerFunc) *httptest.Server {
 	// Start test server
-	lis, err := net.Listen("tcp", ":20002")
+	lis, err := net.Listen("tcp", "localhost:20002")
 	if err != nil {
 		panic(err)
 	}

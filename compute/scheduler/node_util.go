@@ -68,10 +68,10 @@ func SubtractResources(t *tes.Task, in *Resources) *Resources {
 
 	// Check minimum values.
 	if out.Cpus < 1 {
-		out.Cpus = 1
+		out.Cpus = 0
 	}
-	if out.RamGb < 0.001 {
-		out.RamGb = 0.001
+	if out.RamGb < 0.0 {
+		out.RamGb = 0.0
 	}
 	if out.DiskGb < 0.0 {
 		out.DiskGb = 0.0

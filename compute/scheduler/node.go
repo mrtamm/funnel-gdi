@@ -116,12 +116,11 @@ func (n *NodeProcess) Run(ctx context.Context) {
 func (n *NodeProcess) checkConnection(ctx context.Context) {
 	_, err := n.client.GetNode(ctx, &GetNodeRequest{Id: n.conf.Node.ID})
 
-	// If its a 404 error create a new node
 	s, _ := status.FromError(err)
-	if s.Code() != codes.NotFound {
-		n.log.Error("Couldn't contact server.", err)
-	} else {
+	if s.Code() == codes.OK {
 		n.log.Info("Successfully connected to server.")
+	} else {
+		n.log.Error("Couldn't contact server: code="+s.Code().String(), err)
 	}
 }
 
@@ -140,7 +139,7 @@ func (n *NodeProcess) sync(ctx context.Context) {
 		// If its a 404 error create a new node
 		s, _ := status.FromError(err)
 		if s.Code() != codes.NotFound {
-			n.log.Error("Couldn't get node state during sync.", err)
+			n.log.Error("Couldn't get node state during sync: code="+s.Code().String(), err)
 			return
 		}
 		n.log.Info("Starting initial node sync")

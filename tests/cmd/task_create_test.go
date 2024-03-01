@@ -30,8 +30,9 @@ func TestCreateStdin(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ids := strings.Split(strings.TrimSpace(out.String()), "\n")
+	outStr := out.String()
+	ids := strings.Split(strings.TrimSpace(outStr), "\n")
 	if len(ids) != 3 {
-		t.Fatal("err", ids)
+		t.Fatalf("Expected 3, got %d task ID value(s) from stdout buffer %q", len(ids), outStr)
 	}
 }

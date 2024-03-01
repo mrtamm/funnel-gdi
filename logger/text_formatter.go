@@ -21,7 +21,8 @@ import (
 
 var baseTimestamp = time.Now()
 var jsonmar = protojson.MarshalOptions{
-	Indent: "  ",
+	Indent:    "  ",
+	Multiline: false,
 }
 
 type textFormatter struct {
