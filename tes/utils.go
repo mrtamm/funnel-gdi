@@ -33,6 +33,7 @@ func Base64Encode(t *Task) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	fmt.Println(str)
 	str = base64.StdEncoding.EncodeToString([]byte(str))
 	return str, nil
 }
