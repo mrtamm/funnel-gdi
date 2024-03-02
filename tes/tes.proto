@@ -555,15 +555,6 @@ message ServiceInfo {
 // services to create, list, get, update tasks.
 service TaskService {
 
-  // GetServiceInfo provides information about the service,
-  // such as storage details, resource availability, and
-  // other documentation.
-  rpc GetServiceInfo(ServiceInfoRequest) returns (ServiceInfo) {
-    option (google.api.http) = {
-      get: "/v1/tasks/service-info"
-    };
-  }
-
   // Create a new task.
   rpc CreateTask(Task) returns (CreateTaskResponse) {
     option (google.api.http) = {
@@ -595,6 +586,15 @@ service TaskService {
   rpc CancelTask(CancelTaskRequest) returns (CancelTaskResponse) {
     option (google.api.http) = {
       post: "/v1/tasks/{id}:cancel"
+    };
+  }
+
+  // GetServiceInfo provides information about the service,
+  // such as storage details, resource availability, and
+  // other documentation.
+  rpc GetServiceInfo(ServiceInfoRequest) returns (ServiceInfo) {
+    option (google.api.http) = {
+      get: "/v1/tasks/service-info"
     };
   }
 

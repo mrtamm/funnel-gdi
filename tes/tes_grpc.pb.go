@@ -19,21 +19,17 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	TaskService_GetServiceInfo_FullMethodName = "/tes.TaskService/GetServiceInfo"
 	TaskService_CreateTask_FullMethodName     = "/tes.TaskService/CreateTask"
 	TaskService_ListTasks_FullMethodName      = "/tes.TaskService/ListTasks"
 	TaskService_GetTask_FullMethodName        = "/tes.TaskService/GetTask"
 	TaskService_CancelTask_FullMethodName     = "/tes.TaskService/CancelTask"
+	TaskService_GetServiceInfo_FullMethodName = "/tes.TaskService/GetServiceInfo"
 )
 
 // TaskServiceClient is the client API for TaskService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type TaskServiceClient interface {
-	// GetServiceInfo provides information about the service,
-	// such as storage details, resource availability, and
-	// other documentation.
-	GetServiceInfo(ctx context.Context, in *ServiceInfoRequest, opts ...grpc.CallOption) (*ServiceInfo, error)
 	// Create a new task.
 	CreateTask(ctx context.Context, in *Task, opts ...grpc.CallOption) (*CreateTaskResponse, error)
 	// List tasks.
@@ -47,6 +43,10 @@ type TaskServiceClient interface {
 	GetTask(ctx context.Context, in *GetTaskRequest, opts ...grpc.CallOption) (*Task, error)
 	// Cancel a task.
 	CancelTask(ctx context.Context, in *CancelTaskRequest, opts ...grpc.CallOption) (*CancelTaskResponse, error)
+	// GetServiceInfo provides information about the service,
+	// such as storage details, resource availability, and
+	// other documentation.
+	GetServiceInfo(ctx context.Context, in *ServiceInfoRequest, opts ...grpc.CallOption) (*ServiceInfo, error)
 }
 
 type taskServiceClient struct {
@@ -55,15 +55,6 @@ type taskServiceClient struct {
 
 func NewTaskServiceClient(cc grpc.ClientConnInterface) TaskServiceClient {
 	return &taskServiceClient{cc}
-}
-
-func (c *taskServiceClient) GetServiceInfo(ctx context.Context, in *ServiceInfoRequest, opts ...grpc.CallOption) (*ServiceInfo, error) {
-	out := new(ServiceInfo)
-	err := c.cc.Invoke(ctx, TaskService_GetServiceInfo_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
 }
 
 func (c *taskServiceClient) CreateTask(ctx context.Context, in *Task, opts ...grpc.CallOption) (*CreateTaskResponse, error) {
@@ -102,14 +93,19 @@ func (c *taskServiceClient) CancelTask(ctx context.Context, in *CancelTaskReques
 	return out, nil
 }
 
+func (c *taskServiceClient) GetServiceInfo(ctx context.Context, in *ServiceInfoRequest, opts ...grpc.CallOption) (*ServiceInfo, error) {
+	out := new(ServiceInfo)
+	err := c.cc.Invoke(ctx, TaskService_GetServiceInfo_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TaskServiceServer is the server API for TaskService service.
 // All implementations should embed UnimplementedTaskServiceServer
 // for forward compatibility
 type TaskServiceServer interface {
-	// GetServiceInfo provides information about the service,
-	// such as storage details, resource availability, and
-	// other documentation.
-	GetServiceInfo(context.Context, *ServiceInfoRequest) (*ServiceInfo, error)
 	// Create a new task.
 	CreateTask(context.Context, *Task) (*CreateTaskResponse, error)
 	// List tasks.
@@ -123,15 +119,16 @@ type TaskServiceServer interface {
 	GetTask(context.Context, *GetTaskRequest) (*Task, error)
 	// Cancel a task.
 	CancelTask(context.Context, *CancelTaskRequest) (*CancelTaskResponse, error)
+	// GetServiceInfo provides information about the service,
+	// such as storage details, resource availability, and
+	// other documentation.
+	GetServiceInfo(context.Context, *ServiceInfoRequest) (*ServiceInfo, error)
 }
 
 // UnimplementedTaskServiceServer should be embedded to have forward compatible implementations.
 type UnimplementedTaskServiceServer struct {
 }
 
-func (UnimplementedTaskServiceServer) GetServiceInfo(context.Context, *ServiceInfoRequest) (*ServiceInfo, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetServiceInfo not implemented")
-}
 func (UnimplementedTaskServiceServer) CreateTask(context.Context, *Task) (*CreateTaskResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateTask not implemented")
 }
@@ -144,6 +141,9 @@ func (UnimplementedTaskServiceServer) GetTask(context.Context, *GetTaskRequest) 
 func (UnimplementedTaskServiceServer) CancelTask(context.Context, *CancelTaskRequest) (*CancelTaskResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CancelTask not implemented")
 }
+func (UnimplementedTaskServiceServer) GetServiceInfo(context.Context, *ServiceInfoRequest) (*ServiceInfo, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetServiceInfo not implemented")
+}
 
 // UnsafeTaskServiceServer may be embedded to opt out of forward compatibility for this service.
 // Use of this interface is not recommended, as added methods to TaskServiceServer will
@@ -154,24 +154,6 @@ type UnsafeTaskServiceServer interface {
 
 func RegisterTaskServiceServer(s grpc.ServiceRegistrar, srv TaskServiceServer) {
 	s.RegisterService(&TaskService_ServiceDesc, srv)
-}
-
-func _TaskService_GetServiceInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ServiceInfoRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(TaskServiceServer).GetServiceInfo(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: TaskService_GetServiceInfo_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TaskServiceServer).GetServiceInfo(ctx, req.(*ServiceInfoRequest))
-	}
-	return interceptor(ctx, in, info, handler)
 }
 
 func _TaskService_CreateTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -246,6 +228,24 @@ func _TaskService_CancelTask_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TaskService_GetServiceInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ServiceInfoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).GetServiceInfo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_GetServiceInfo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).GetServiceInfo(ctx, req.(*ServiceInfoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TaskService_ServiceDesc is the grpc.ServiceDesc for TaskService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -253,10 +253,6 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "tes.TaskService",
 	HandlerType: (*TaskServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "GetServiceInfo",
-			Handler:    _TaskService_GetServiceInfo_Handler,
-		},
 		{
 			MethodName: "CreateTask",
 			Handler:    _TaskService_CreateTask_Handler,
@@ -272,6 +268,10 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CancelTask",
 			Handler:    _TaskService_CancelTask_Handler,
+		},
+		{
+			MethodName: "GetServiceInfo",
+			Handler:    _TaskService_GetServiceInfo_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
