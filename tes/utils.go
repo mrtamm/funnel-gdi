@@ -13,8 +13,9 @@ import (
 
 // Marshaler marshals tasks to indented JSON.
 var Marshaler = protojson.MarshalOptions{
-	Indent:    "  ",
-	Multiline: false,
+	Indent:        "  ",
+	Multiline:     false,
+	UseProtoNames: true,
 }
 var Unmarshaler = protojson.UnmarshalOptions{}
 
