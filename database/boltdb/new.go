@@ -1,6 +1,7 @@
 package boltdb
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/boltdb/bolt"
@@ -39,7 +40,8 @@ var ExecutorStderr = []byte("executor-stderr")
 var Nodes = []byte("nodes")
 
 // SysLogs defeines the name of a bucket with maps
-//  task ID -> tes.TaskLog.SystemLogs
+//
+//	task ID -> tes.TaskLog.SystemLogs
 var SysLogs = []byte("system-logs")
 
 // BoltDB provides handlers for gRPC endpoints.
@@ -51,7 +53,9 @@ type BoltDB struct {
 // NewBoltDB returns a new instance of BoltDB, accessing the database at
 // the given path, and including the given ServerConfig.
 func NewBoltDB(conf config.BoltDB) (*BoltDB, error) {
-	fsutil.EnsurePath(conf.Path)
+	if err := fsutil.EnsurePath(conf.Path); err != nil {
+		return nil, err
+	}
 	db, err := bolt.Open(conf.Path, 0600, &bolt.Options{
 		Timeout: time.Second * 5,
 	})
@@ -65,35 +69,26 @@ func NewBoltDB(conf config.BoltDB) (*BoltDB, error) {
 func (taskBolt *BoltDB) Init() error {
 	// Check to make sure all the required buckets have been created
 	return taskBolt.db.Update(func(tx *bolt.Tx) error {
-		if tx.Bucket(TaskBucket) == nil {
-			tx.CreateBucket(TaskBucket)
-		}
-		if tx.Bucket(TasksQueued) == nil {
-			tx.CreateBucket(TasksQueued)
-		}
-		if tx.Bucket(TaskState) == nil {
-			tx.CreateBucket(TaskState)
-		}
-		if tx.Bucket(TasksLog) == nil {
-			tx.CreateBucket(TasksLog)
-		}
-		if tx.Bucket(ExecutorLogs) == nil {
-			tx.CreateBucket(ExecutorLogs)
-		}
-		if tx.Bucket(ExecutorStdout) == nil {
-			tx.CreateBucket(ExecutorStdout)
-		}
-		if tx.Bucket(ExecutorStderr) == nil {
-			tx.CreateBucket(ExecutorStderr)
-		}
-		if tx.Bucket(Nodes) == nil {
-			tx.CreateBucket(Nodes)
-		}
-		if tx.Bucket(SysLogs) == nil {
-			tx.CreateBucket(SysLogs)
-		}
+		ensureBucket(tx, TaskBucket)
+		ensureBucket(tx, TasksQueued)
+		ensureBucket(tx, TaskState)
+		ensureBucket(tx, TasksLog)
+		ensureBucket(tx, ExecutorLogs)
+		ensureBucket(tx, ExecutorStdout)
+		ensureBucket(tx, ExecutorStderr)
+		ensureBucket(tx, Nodes)
+		ensureBucket(tx, SysLogs)
 		return nil
 	})
+}
+
+func ensureBucket(tx *bolt.Tx, id []byte) {
+	if tx.Bucket(id) == nil {
+		if _, err := tx.CreateBucket(id); err != nil {
+			fmt.Printf("Detected error while creating non-existing "+
+				"Bolt bucket [%s]: %s\n", string(id), err)
+		}
+	}
 }
 
 func (taskBolt *BoltDB) Close() {

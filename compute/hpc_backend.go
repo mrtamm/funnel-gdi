@@ -74,15 +74,20 @@ func (b *HPCBackend) Submit(task *tes.Task) error {
 
 	err = cmd.Run()
 	if err != nil {
-		b.Event.WriteEvent(ctx, events.NewState(task.Id, tes.SystemError))
-		b.Event.WriteEvent(
-			ctx,
-			events.NewSystemLog(
-				task.Id, 0, 0, "error",
-				"error submitting task to "+b.Name,
-				map[string]string{"error": err.Error(), "stderr": stderr.String(), "stdout": stdout.String()},
-			),
+		if err2 := b.Event.WriteEvent(ctx, events.NewState(task.Id, tes.SystemError)); err2 != nil {
+			b.Log.Error("Detected error while writing SystemError event", err2)
+		}
+
+		sl := events.NewSystemLog(
+			task.Id, 0, 0, "error",
+			"error submitting task to "+b.Name,
+			map[string]string{"error": err.Error(), "stderr": stderr.String(), "stdout": stdout.String()},
 		)
+
+		if err2 := b.Event.WriteEvent(ctx, sl); err2 != nil {
+			b.Log.Error("Detected error while writing SystemLog event", err2)
+		}
+
 		return err
 	}
 
@@ -193,21 +198,28 @@ ReconcileLoop:
 						}
 
 						if t.TESState == tes.SystemError {
-							b.Event.WriteEvent(ctx, events.NewState(task.Id, tes.SystemError))
-							b.Event.WriteEvent(
-								ctx,
-								events.NewSystemLog(
-									task.Id, 0, 0, "error",
-									b.Name+" reports system error for task",
-									map[string]string{
-										"error":           t.Reason,
-										b.Name + "_id":    t.ID,
-										b.Name + "_state": t.State,
-									},
-								),
+							if err2 := b.Event.WriteEvent(ctx, events.NewState(task.Id, tes.SystemError)); err2 != nil {
+								b.Log.Error("Detected error while writing SystemError event", err2)
+							}
+
+							sl := events.NewSystemLog(
+								task.Id, 0, 0, "error",
+								b.Name+" reports system error for task",
+								map[string]string{
+									"error":           t.Reason,
+									b.Name + "_id":    t.ID,
+									b.Name + "_state": t.State,
+								},
 							)
+
+							if err2 := b.Event.WriteEvent(ctx, sl); err2 != nil {
+								b.Log.Error("Detected error while writing SystemLog event", err2)
+							}
+
 							if t.Remove {
-								exec.Command(b.CancelCmd, t.ID).Run()
+								if err2 := exec.Command(b.CancelCmd, t.ID).Run(); err2 != nil {
+									b.Log.Error("Detected error while running Cancel command", err2)
+								}
 							}
 						}
 					}

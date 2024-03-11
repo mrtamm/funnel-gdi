@@ -14,19 +14,32 @@ import (
 func TestStopNode(t *testing.T) {
 	conf := config.DefaultConfig()
 	conf.Node.UpdateRate = config.Duration(time.Millisecond * 2)
-	n := newTestNode(conf, t)
+
+	n := newTestNode(conf)
 
 	n.Client.On("GetNode", mock.Anything, mock.Anything, mock.Anything).
 		Return(&Node{}, nil)
 
-	stop := n.Start()
+	// Start the node:
+	cancel := n.Start()
 
-	// Fail if this test doesn't complete in the given time.
-	cleanup := timeLimit(t, time.Millisecond*100)
-	defer cleanup()
-	stop()
-	n.Wait()
-	n.Client.AssertCalled(t, "Close")
+	finished := make(chan bool)
+
+	// In the background: stop the node and wait, it will report when done
+	go func() {
+		cancel()
+		n.Wait()
+		finished <- true
+	}()
+
+	// Fail if this test doesn't complete in given time.
+	select {
+	case <-finished:
+		n.Client.AssertCalled(t, "Close")
+		t.Log("Node finished before test-timeout")
+	case <-time.After(time.Millisecond * 100):
+		t.Fatal("Node took more time to finish than permitted (100ms)")
+	}
 }
 
 // Mainly exercising a panic bug caused by an unhandled
@@ -34,7 +47,7 @@ func TestStopNode(t *testing.T) {
 func TestGetNodeFail(t *testing.T) {
 	conf := config.DefaultConfig()
 	conf.Node.UpdateRate = config.Duration(time.Millisecond * 2)
-	n := newTestNode(conf, t)
+	n := newTestNode(conf)
 
 	// Set GetNode to return an error
 	n.Client.On("GetNode", mock.Anything, mock.Anything, mock.Anything).
@@ -49,7 +62,7 @@ func TestNodeTimeout(t *testing.T) {
 	conf.Node.Timeout = config.Duration(time.Millisecond)
 	conf.Node.UpdateRate = config.Duration(time.Millisecond * 2)
 
-	n := newTestNode(conf, t)
+	n := newTestNode(conf)
 
 	// Set up a test worker which this code can easily control.
 	//w := testWorker{}
@@ -62,18 +75,28 @@ func TestNodeTimeout(t *testing.T) {
 	n.Start()
 
 	// Fail if this test doesn't complete in the given time.
-	cleanup := timeLimit(t, time.Duration(conf.Node.Timeout*500))
-	defer cleanup()
+	finished := make(chan bool)
 
-	// Wait for the node to exit
-	n.Wait()
+	// In the background: wait for the node to exit, it will report when done
+	go func() {
+		n.Wait()
+		finished <- true
+	}()
+
+	// Fail if this test doesn't complete in given time.
+	select {
+	case <-finished:
+		t.Log("Node completed before test-timeout")
+	case <-time.After(time.Duration(conf.Node.Timeout * 500)):
+		t.Fatal("Node took more time (5ms) than permitted with timeout (1ms)")
+	}
 }
 
 // Test that a node does nothing where there are no assigned tasks.
 func TestNoTasks(t *testing.T) {
 	conf := config.DefaultConfig()
 	conf.Node.UpdateRate = config.Duration(time.Millisecond * 2)
-	n := newTestNode(conf, t)
+	n := newTestNode(conf)
 
 	// Tell the scheduler mock to return nothing
 	n.Client.On("GetNode", mock.Anything, mock.Anything, mock.Anything).
@@ -103,7 +126,7 @@ func TestNoTasks(t *testing.T) {
 func TestNodeWorkerCreated(t *testing.T) {
 	conf := config.DefaultConfig()
 	conf.Node.UpdateRate = config.Duration(time.Millisecond * 2)
-	n := newTestNode(conf, t)
+	n := newTestNode(conf)
 
 	// Count the number of times the worker factory was called
 	var count int
@@ -126,7 +149,7 @@ func TestNodeWorkerCreated(t *testing.T) {
 func TestFinishedTaskNotRerun(t *testing.T) {
 	conf := config.DefaultConfig()
 	conf.Node.UpdateRate = config.Duration(time.Millisecond * 2)
-	n := newTestNode(conf, t)
+	n := newTestNode(conf)
 
 	// Set up a test worker which this code can easily control.
 	//w := testWorker{}
@@ -158,7 +181,7 @@ func TestFinishedTaskNotRerun(t *testing.T) {
 func TestFinishedTaskRunsetCount(t *testing.T) {
 	conf := config.DefaultConfig()
 	conf.Node.UpdateRate = config.Duration(time.Millisecond * 2)
-	n := newTestNode(conf, t)
+	n := newTestNode(conf)
 
 	// Set up a test worker which this code can easily control.
 	//w := testWorker{}

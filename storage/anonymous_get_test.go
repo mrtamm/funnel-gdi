@@ -2,13 +2,13 @@ package storage
 
 import (
 	"context"
-	"net/http"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/ohsu-comp-bio/funnel/config"
+	"google.golang.org/api/option"
 	"google.golang.org/api/storage/v1"
 )
 
@@ -47,7 +47,7 @@ func TestAmazonS3AnonymousGet(t *testing.T) {
 }
 
 func TestGoogleStorageAnonymousGet(t *testing.T) {
-	svc, err := storage.New(&http.Client{})
+	svc, err := storage.NewService(context.Background(), option.WithoutAuthentication())
 	if err != nil {
 		t.Fatal("Error creating GS backend:", err)
 	}

@@ -8,30 +8,28 @@ jobs:
     name: lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: 1.21
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v4
-        with:
-          version: v1.56.2
-          args: --skip-dirs tests --modules-download-mode mod --timeout 10m --verbose
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version-file: go.mod
+    - name: golangci-lint
+      uses: golangci/golangci-lint-action@v4
+      with:
+        version: v1.56.2
+        skip-pkg-cache: true
+        args: --skip-dirs tests --timeout 10m --verbose
 
   build:
     runs-on: ubuntu-latest
     steps:
+    - name: Check out code
+      uses: actions/checkout@v4
     - name: Set up Go 1.x
       uses: actions/setup-go@v5
       with:
-        go-version: ^1.21
-
-    - name: Check out code
-      uses: actions/checkout@v4
-
+        go-version-file: go.mod
     - name: Build
       run: go build -v ./
-
     - name: Store funnel
       uses: actions/upload-artifact@v4
       with:
@@ -41,12 +39,12 @@ jobs:
   unitTest:
     runs-on: ubuntu-latest
     steps:
+    - name: Check out code
+      uses: actions/checkout@v4
     - name: Set up Go 1.x
       uses: actions/setup-go@v5
       with:
-        go-version: ^1.21
-    - name: Check out code
-      uses: actions/checkout@v4
+        go-version-file: go.mod
     - name: Unit Tests
       run: make test
 
@@ -56,14 +54,12 @@ jobs:
     steps:
     - name: Check out code
       uses: actions/checkout@v4
-
-    - name: Download funnel bin
-      uses: actions/download-artifact@v4
+    - name: Set up Go 1.x
+      uses: actions/setup-go@v5
       with:
-        name: funnelBin
+        go-version-file: go.mod
     - name: MongoTest
       run: |
-        chmod +x funnel
         make start-mongodb
         sleep 10
         make test-mongodb
@@ -74,12 +70,9 @@ jobs:
     steps:
     - name: Check out code
       uses: actions/checkout@v4
-
-    - name: Download funnel bin
-      uses: actions/download-artifact@v4
+    - name: Set up Go 1.x
+      uses: actions/setup-go@v5
       with:
-        name: funnelBin
+        go-version-file: go.mod
     - name: Badger Test
-      run: |
-        chmod +x funnel
-        make test-badger
+      run: make test-badger

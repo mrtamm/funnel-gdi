@@ -1,12 +1,12 @@
 package task
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 
-	"github.com/golang/protobuf/jsonpb"
+	"encoding/json"
+
 	"github.com/ohsu-comp-bio/funnel/tes"
 	"golang.org/x/net/context"
 )
@@ -22,17 +22,17 @@ func Create(server string, files []string, reader io.Reader, writer io.Writer) e
 
 	for _, taskFile := range files {
 		f, err := os.Open(taskFile)
-		defer f.Close()
 		if err != nil {
 			return err
 		}
+		defer f.Close()
 		reader = io.MultiReader(reader, f)
 	}
 
 	dec := json.NewDecoder(reader)
 	for {
 		var task tes.Task
-		err := jsonpb.UnmarshalNext(dec, &task)
+		err := dec.Decode(&task)
 		if err == io.EOF {
 			break
 		}

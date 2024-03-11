@@ -204,7 +204,7 @@ func (u *upload) Failed(err error) {
 // fixLinks walks the output paths, fixing cases where a symlink is
 // broken because it's pointing to a path inside a container volume.
 func fixLinks(mapper *FileMapper, basepath string) {
-	filepath.Walk(basepath, func(p string, f os.FileInfo, err error) error {
+	_ = filepath.Walk(basepath, func(p string, f os.FileInfo, err error) error {
 		if err != nil {
 			// There's an error, so be safe and give up on this file
 			return nil
@@ -235,11 +235,9 @@ func fixLinks(mapper *FileMapper, basepath string) {
 
 				// If the mapped path exists, fix the symlink
 				if err == nil {
-					err := os.Remove(p)
-					if err != nil {
-						return nil
+					if err = os.Remove(p); err == nil {
+						_ = os.Symlink(mapped, p)
 					}
-					os.Symlink(mapped, p)
 				}
 			}
 		}

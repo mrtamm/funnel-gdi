@@ -64,7 +64,11 @@ func (c *OidcConfig) initJwks() {
 
 	// Define JWKS cache:
 	c.jwks = *jwk.NewCache(ctx)
-	c.jwks.Register(jwksUrl, jwk.WithMinRefreshInterval(15*time.Minute))
+	if err := c.jwks.Register(jwksUrl, jwk.WithMinRefreshInterval(15*time.Minute)); err != nil {
+		fmt.Printf("[ERROR] Failed to register JWKS (%s) of the OIDC service "+
+			"(%s): %s\n", jwksUrl, c.local.ServiceConfigUrl, err)
+		os.Exit(1)
+	}
 
 	// Init JWKS cache:
 	ctx2, _ := context.WithTimeout(ctx, 10*time.Second)

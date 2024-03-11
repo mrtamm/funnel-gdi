@@ -12,7 +12,7 @@ import (
 
 func testServer(mux http.Handler) *httptest.Server {
 	// Start test server
-	lis, err := net.Listen("tcp", ":20001")
+	lis, err := net.Listen("tcp", "localhost:20001")
 	if err != nil {
 		panic(err)
 	}
@@ -39,7 +39,11 @@ func TestGetTask(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/tasks/test-id", func(w http.ResponseWriter, r *http.Request) {
 		ta := Task{Id: "test-id"}
-		Marshaler.Marshal(w, &ta)
+		if b, err := Marshaler.Marshal(&ta); err != nil {
+			t.Error(err)
+		} else if _, err2 := w.Write(b); err2 != nil {
+			t.Error("Failed to write response", err2)
+		}
 	})
 
 	ts := testServer(mux)
@@ -70,7 +74,11 @@ func TestGetTaskTrailingSlash(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/tasks/test-id", func(w http.ResponseWriter, r *http.Request) {
 		ta := Task{Id: "test-id"}
-		Marshaler.Marshal(w, &ta)
+		if b, err := Marshaler.Marshal(&ta); err != nil {
+			t.Error(err)
+		} else if _, err2 := w.Write(b); err2 != nil {
+			t.Error("Failed to write response", err2)
+		}
 	})
 
 	ts := testServer(mux)

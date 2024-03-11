@@ -4,7 +4,6 @@ package logger
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"runtime"
 	"strings"
@@ -74,13 +73,14 @@ func (l *Logger) SetOutput(o io.Writer) {
 
 // Discard configures the logger to discard all logs.
 func (l *Logger) Discard() {
-	l.SetOutput(ioutil.Discard)
+	l.SetOutput(io.Discard)
 }
 
 // Debug logs a debug message.
 //
 // After the first argument, arguments are key-value pairs which are written as structured logs.
-//     log.Debug("Some message here", "key1", value1, "key2", value2)
+//
+//	log.Debug("Some message here", "key1", value1, "key2", value2)
 func (l *Logger) Debug(msg string, args ...interface{}) {
 	if l == nil {
 		return
@@ -93,7 +93,8 @@ func (l *Logger) Debug(msg string, args ...interface{}) {
 // Info logs an info message
 //
 // After the first argument, arguments are key-value pairs which are written as structured logs.
-//     log.Info("Some message here", "key1", value1, "key2", value2)
+//
+//	log.Info("Some message here", "key1", value1, "key2", value2)
 func (l *Logger) Info(msg string, args ...interface{}) {
 	if l == nil {
 		return
@@ -106,11 +107,13 @@ func (l *Logger) Info(msg string, args ...interface{}) {
 // Error logs an error message
 //
 // After the first argument, arguments are key-value pairs which are written as structured logs.
-//     log.Error("Some message here", "key1", value1, "key2", value2)
+//
+//	log.Error("Some message here", "key1", value1, "key2", value2)
 //
 // Error has a two-argument version that can be used as a shortcut.
-//     err := startServer()
-//     log.Error("Couldn't start server", err)
+//
+//	err := startServer()
+//	log.Error("Couldn't start server", err)
 func (l *Logger) Error(msg string, args ...interface{}) {
 	if l == nil {
 		return
@@ -136,7 +139,8 @@ func (l *Logger) Error(msg string, args ...interface{}) {
 // Warn logs an warning message
 //
 // After the first argument, arguments are key-value pairs which are written as structured logs.
-//     log.Info("Some message here", "key1", value1, "key2", value2)
+//
+//	log.Info("Some message here", "key1", value1, "key2", value2)
 func (l *Logger) Warn(msg string, args ...interface{}) {
 	if l == nil {
 		return

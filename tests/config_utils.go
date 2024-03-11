@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"path"
@@ -70,7 +69,7 @@ func TestifyConfig(conf config.Config) config.Config {
 	conf.PBS.ReconcileRate = reconcile
 	conf.AWSBatch.ReconcileRate = reconcile
 
-	storageDir, _ := ioutil.TempDir("./test_tmp", "funnel-test-storage-")
+	storageDir, _ := os.MkdirTemp("./test_tmp", "funnel-test-storage-")
 	wd, _ := os.Getwd()
 	fsutil.EnsureDir(storageDir)
 
@@ -91,6 +90,7 @@ func RandomPort() string {
 
 // RandomPortConfig returns a modified config with random HTTP and RPC ports.
 func RandomPortConfig(conf config.Config) config.Config {
+	conf.Server.HostName = "localhost"
 	conf.Server.RPCPort = RandomPort()
 	conf.Server.HTTPPort = RandomPort()
 	conf.RPCClient.ServerAddress = conf.Server.RPCAddress()
@@ -100,7 +100,7 @@ func RandomPortConfig(conf config.Config) config.Config {
 // TempDirConfig returns a modified config with workdir and db path set to a temp. directory.
 func TempDirConfig(conf config.Config) config.Config {
 	os.Mkdir("./test_tmp", os.ModePerm)
-	f, _ := ioutil.TempDir("./test_tmp", "funnel-test-")
+	f, _ := os.MkdirTemp("./test_tmp", "funnel-test-")
 	conf.Worker.WorkDir = f
 	conf.BoltDB.Path = path.Join(f, "funnel.db")
 	conf.Badger.Path = path.Join(f, "funnel.badger.db")

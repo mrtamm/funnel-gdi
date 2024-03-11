@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/ohsu-comp-bio/funnel/tes"
@@ -83,48 +84,75 @@ func NewTaskWriter(taskID string, attempt uint32, w Writer) *TaskWriter {
 }
 
 // State sets the state of the task.
-func (ew *TaskWriter) State(s tes.State) error {
-	return ew.out.WriteEvent(context.Background(), ew.gen.State(s))
+func (ew *TaskWriter) State(s tes.State) {
+	if err := ew.out.WriteEvent(context.Background(), ew.gen.State(s)); err != nil {
+		fmt.Printf("Detected error while writing task state event: %s\n", err)
+		fmt.Printf("Original state: %s\n", s)
+	}
 }
 
 // StartTime updates the task's start time log.
-func (ew *TaskWriter) StartTime(t time.Time) error {
-	return ew.out.WriteEvent(context.Background(), ew.gen.StartTime(t))
+func (ew *TaskWriter) StartTime(t time.Time) {
+	if err := ew.out.WriteEvent(context.Background(), ew.gen.StartTime(t)); err != nil {
+		fmt.Printf("Detected error while writing task start-time event: %s\n", err)
+		fmt.Printf("Original start-time: %s\n", t)
+	}
 }
 
 // EndTime updates the task's end time log.
-func (ew *TaskWriter) EndTime(t time.Time) error {
-	return ew.out.WriteEvent(context.Background(), ew.gen.EndTime(t))
+func (ew *TaskWriter) EndTime(t time.Time) {
+	if err := ew.out.WriteEvent(context.Background(), ew.gen.EndTime(t)); err != nil {
+		fmt.Printf("Detected error while writing task end-time event: %s\n", err)
+		fmt.Printf("Original end-time: %s\n", t)
+	}
 }
 
 // Outputs updates the task's output file log.
-func (ew *TaskWriter) Outputs(f []*tes.OutputFileLog) error {
-	return ew.out.WriteEvent(context.Background(), ew.gen.Outputs(f))
+func (ew *TaskWriter) Outputs(f []*tes.OutputFileLog) {
+	if err := ew.out.WriteEvent(context.Background(), ew.gen.Outputs(f)); err != nil {
+		fmt.Printf("Detected error while writing task outputs event: %s\n", err)
+		fmt.Printf("Original task outputs: %s\n", f)
+	}
 }
 
 // Metadata updates the task's metadata log.
-func (ew *TaskWriter) Metadata(m map[string]string) error {
-	return ew.out.WriteEvent(context.Background(), ew.gen.Metadata(m))
+func (ew *TaskWriter) Metadata(m map[string]string) {
+	if err := ew.out.WriteEvent(context.Background(), ew.gen.Metadata(m)); err != nil {
+		fmt.Printf("Detected error while writing task metadata event: %s\n", err)
+		fmt.Printf("Original task metadata: %v\n", m)
+	}
 }
 
 // Info creates an info level system log message.
-func (ew *TaskWriter) Info(msg string, args ...interface{}) error {
-	return ew.sys.Info(msg, args...)
+func (ew *TaskWriter) Info(msg string, args ...interface{}) {
+	if err := ew.sys.Info(msg, args...); err != nil {
+		fmt.Printf("Detected error while writing task info event: %s\n", err)
+		fmt.Printf("Original task info message: %v\n", msg)
+	}
 }
 
 // Debug creates a debug level system log message.
-func (ew *TaskWriter) Debug(msg string, args ...interface{}) error {
-	return ew.sys.Debug(msg, args...)
+func (ew *TaskWriter) Debug(msg string, args ...interface{}) {
+	if err := ew.sys.Debug(msg, args...); err != nil {
+		fmt.Printf("Detected error while writing task debug event: %s\n", err)
+		fmt.Printf("Original task debug message: %v\n", msg)
+	}
 }
 
 // Error creates an error level system log message.
-func (ew *TaskWriter) Error(msg string, args ...interface{}) error {
-	return ew.sys.Error(msg, args...)
+func (ew *TaskWriter) Error(msg string, args ...interface{}) {
+	if err := ew.sys.Error(msg, args...); err != nil {
+		fmt.Printf("Detected error while writing task error event: %s\n", err)
+		fmt.Printf("Original task error message: %v\n", msg)
+	}
 }
 
 // Warn creates a warning level system log message.
-func (ew *TaskWriter) Warn(msg string, args ...interface{}) error {
-	return ew.sys.Warn(msg, args...)
+func (ew *TaskWriter) Warn(msg string, args ...interface{}) {
+	if err := ew.sys.Warn(msg, args...); err != nil {
+		fmt.Printf("Detected error while writing task warning event: %s\n", err)
+		fmt.Printf("Original task warning message: %v\n", msg)
+	}
 }
 
 // NewExecutorWriter returns a new ExecutorEventWriter instance that inherits

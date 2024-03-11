@@ -3,7 +3,7 @@ package run
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -13,14 +13,14 @@ import (
 )
 
 // ErrKeyFmt describes an error in input/output/env/tag flag formatting
-var ErrKeyFmt = errors.New("Arguments passed to --in, --out, --tag and --env must be of the form: KEY=VALUE")
+var ErrKeyFmt = errors.New("arguments passed to --in, --out, --tag and --env must be of the form: KEY=VALUE")
 
-// ErrStorageScheme describes an error in supported storage URL schemes.
-var ErrStorageScheme = errors.New("File paths must be prefixed with one of:\n file://\n gs://\n s3://")
+// StorageScheme describes an error in supported storage URL schemes.
+var ErrStorageScheme = errors.New("file paths must be prefixed with one of:\n file://\n gs://\n s3://")
 
 // DuplicateKeyErr returns a new error describing conflicting keys for env. vars., inputs, and outputs.
 func DuplicateKeyErr(key string) error {
-	return errors.New("Can't use the same KEY for multiple --in, --out, --tag, --env arguments: " + key)
+	return errors.New("can't use the same KEY for multiple --in, --out, --tag, --env arguments: " + key)
 }
 
 // Parse CLI variable definitions (e.g "varname=value") into usable task values.
@@ -197,7 +197,7 @@ func valsToTask(vals flagVals) (task *tes.Task, err error) {
 }
 
 func getContent(p string) string {
-	b, err := ioutil.ReadFile(p)
+	b, err := os.ReadFile(p)
 	if err != nil {
 		panic(err)
 	}
@@ -215,14 +215,6 @@ func parseCliVar(raw string) (string, string) {
 	key := res[0]
 	val := res[1]
 	return key, val
-}
-
-// Give a input/output URL "raw", return the path of the file
-// relative to the container.
-func containerPath(raw, base string) string {
-	url := resolvePath(raw)
-	p := stripStoragePrefix(url)
-	return base + p
 }
 
 func stripStoragePrefix(url string) string {

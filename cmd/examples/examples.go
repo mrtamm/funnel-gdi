@@ -20,7 +20,7 @@ var Cmd = &cobra.Command{
 		byShortName := map[string]string{}
 		taskEx := ex.Examples()
 		for n, v := range taskEx {
-			byShortName[n] = v
+			byShortName[n] = string(v)
 		}
 
 		confEx := config.Examples()

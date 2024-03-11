@@ -2,15 +2,14 @@ package worker
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 
-	proto "github.com/golang/protobuf/proto"
 	"github.com/ohsu-comp-bio/funnel/tes"
 	"github.com/ohsu-comp-bio/funnel/util/fsutil"
+	"google.golang.org/protobuf/proto"
 )
 
 // FileMapper is responsible for mapping paths into a working directory on the
@@ -151,7 +150,7 @@ func (mapper *FileMapper) HostPath(src string) (string, error) {
 // OpenHostFile opens a file on the host file system at a mapped path.
 // "src" is an unmapped path. This function will handle mapping the path.
 //
-// This function calls os.Open
+// This function calls os.Open.
 //
 // If the path can't be mapped or the file can't be opened, an error is returned.
 func (mapper *FileMapper) OpenHostFile(src string) (*os.File, error) {
@@ -169,7 +168,7 @@ func (mapper *FileMapper) OpenHostFile(src string) (*os.File, error) {
 // CreateHostFile creates a file on the host file system at a mapped path.
 // "src" is an unmapped path. This function will handle mapping the path.
 //
-// This function calls os.Create
+// This function calls os.Create.
 //
 // If the path can't be mapped or the file can't be created, an error is returned.
 func (mapper *FileMapper) CreateHostFile(src string) (*os.File, error) {
@@ -234,7 +233,7 @@ func (mapper *FileMapper) AddInput(input *tes.Input) error {
 
 	// If 'content' field is set create the file
 	if input.Content != "" {
-		err := ioutil.WriteFile(hostPath, []byte(input.Content), 0775)
+		err := os.WriteFile(hostPath, []byte(input.Content), 0775)
 		if err != nil {
 			return fmt.Errorf("Error writing content of task input to file %v", err)
 		}

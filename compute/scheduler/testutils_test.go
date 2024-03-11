@@ -2,8 +2,7 @@ package scheduler
 
 import (
 	"context"
-	"io/ioutil"
-	"testing"
+	"os"
 	"time"
 
 	"github.com/ohsu-comp-bio/funnel/config"
@@ -19,8 +18,8 @@ type testNode struct {
 	done   chan struct{}
 }
 
-func newTestNode(conf config.Config, t *testing.T) testNode {
-	workDir, _ := ioutil.TempDir("", "funnel-test-storage-")
+func newTestNode(conf config.Config) testNode {
+	workDir, _ := os.MkdirTemp("", "funnel-test-storage-")
 	conf.Worker.WorkDir = workDir
 	log := logger.NewLogger("test-node", logger.DebugConfig())
 
@@ -77,18 +76,4 @@ func (t *testNode) AddTasks(ids ...string) {
 
 	t.Client.On("GetNode", mock.Anything, mock.Anything, mock.Anything).
 		Return(&Node{}, nil)
-}
-
-func timeLimit(t *testing.T, d time.Duration) func() {
-	stop := make(chan struct{})
-	go func() {
-		select {
-		case <-time.NewTimer(d).C:
-			t.Fatal("time limit expired")
-		case <-stop:
-		}
-	}()
-	return func() {
-		close(stop)
-	}
 }

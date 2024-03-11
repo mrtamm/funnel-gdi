@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	"fmt"
 
 	"cloud.google.com/go/pubsub"
 	"github.com/ohsu-comp-bio/funnel/config"
@@ -97,15 +98,19 @@ func ReadPubSub(ctx context.Context, conf config.PubSub, subname string, w Write
 		}
 	}
 
-	sub.Receive(ctx, func(ctx oldctx.Context, m *pubsub.Message) {
+	return sub.Receive(ctx, func(ctx oldctx.Context, m *pubsub.Message) {
 		ev := &Event{}
-		err := Unmarshal(m.Data, ev)
-		if err != nil {
+
+		if err := Unmarshal(m.Data, ev); err != nil {
+			fmt.Printf("Error detected while unmarshaling PubSub event message data: %s\n", err)
 			return
 		}
-		w.WriteEvent(context.Background(), ev)
+
+		if err := w.WriteEvent(context.Background(), ev); err != nil {
+			fmt.Printf("Error detected while writing PubSub event: %s\n", err)
+			return
+		}
+
 		m.Ack()
 	})
-
-	return nil
 }

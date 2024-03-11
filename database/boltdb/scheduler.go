@@ -4,12 +4,12 @@ import (
 	"fmt"
 
 	"github.com/boltdb/bolt"
-	proto "github.com/golang/protobuf/proto"
 	"github.com/ohsu-comp-bio/funnel/compute/scheduler"
 	"github.com/ohsu-comp-bio/funnel/tes"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 // queueTask adds a task to the scheduler queue.
@@ -18,8 +18,7 @@ func (taskBolt *BoltDB) queueTask(task *tes.Task) error {
 	idBytes := []byte(taskID)
 
 	err := taskBolt.db.Update(func(tx *bolt.Tx) error {
-		tx.Bucket(TasksQueued).Put(idBytes, []byte{})
-		return nil
+		return tx.Bucket(TasksQueued).Put(idBytes, []byte{})
 	})
 	if err != nil {
 		return fmt.Errorf("can't queue task: %s", err)
@@ -30,7 +29,7 @@ func (taskBolt *BoltDB) queueTask(task *tes.Task) error {
 // ReadQueue returns a slice of queued Tasks. Up to "n" tasks are returned.
 func (taskBolt *BoltDB) ReadQueue(n int) []*tes.Task {
 	tasks := make([]*tes.Task, 0)
-	taskBolt.db.View(func(tx *bolt.Tx) error {
+	err := taskBolt.db.View(func(tx *bolt.Tx) error {
 
 		// Iterate over the TasksQueued bucket, reading the first `n` tasks
 		c := tx.Bucket(TasksQueued).Cursor()
@@ -41,6 +40,9 @@ func (taskBolt *BoltDB) ReadQueue(n int) []*tes.Task {
 		}
 		return nil
 	})
+	if err != nil {
+		fmt.Printf("Detected error while reading task queue from Bolt: %s\n", err)
+	}
 	return tasks
 }
 
@@ -54,7 +56,9 @@ func (taskBolt *BoltDB) PutNode(ctx context.Context, node *scheduler.Node) (*sch
 		existing := &scheduler.Node{}
 		data := tx.Bucket(Nodes).Get([]byte(node.Id))
 		if data != nil {
-			proto.Unmarshal(data, existing)
+			if err2 := proto.Unmarshal(data, existing); err2 != nil {
+				fmt.Printf("Detected error while unmarshaling node info from bucket [%s]: %s\n", node.Id, err2)
+			}
 		}
 
 		if existing.GetVersion() != 0 && node.Version != existing.GetVersion() {
@@ -90,7 +94,7 @@ func (taskBolt *BoltDB) GetNode(ctx context.Context, req *scheduler.GetNodeReque
 	})
 
 	if err == errNotFound {
-		return nil, grpc.Errorf(codes.NotFound, fmt.Sprintf("%v: nodeID: %s", err.Error(), req.Id))
+		return nil, status.Errorf(codes.NotFound, fmt.Sprintf("%v: nodeID: %s", err.Error(), req.Id))
 	}
 
 	if err != nil {

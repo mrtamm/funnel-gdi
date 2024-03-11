@@ -49,17 +49,20 @@ func (tg *taskGroup) _run(task *tes.Task, wait bool, waitFor []string) error {
 
 	if tg.printTask {
 		// Marshal message to JSON
-		taskJSON, merr := tg.client.Marshaler.MarshalToString(task)
+		taskJSON, merr := tg.client.Marshaler.Marshal(task)
 		if merr != nil {
 			return merr
 		}
-		fmt.Println(taskJSON)
+		fmt.Println(string(taskJSON))
 		return nil
 	}
 
 	if len(waitFor) > 0 {
 		for _, tid := range waitFor {
-			tg.client.WaitForTask(context.Background(), tid)
+			err := tg.client.WaitForTask(context.Background(), tid)
+			if err != nil {
+				return err
+			}
 		}
 	}
 

@@ -1,17 +1,17 @@
 package gce
 
 import (
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/ohsu-comp-bio/funnel/config"
 )
 
 func loadTestData(name string) []byte {
-	b, err := ioutil.ReadFile(name + ".json")
+	b, err := os.ReadFile(name + ".json")
 	if err != nil {
 		panic(err)
 	}
@@ -20,7 +20,7 @@ func loadTestData(name string) []byte {
 
 func testServer(f http.HandlerFunc) *httptest.Server {
 	// Start test server
-	lis, err := net.Listen("tcp", ":20002")
+	lis, err := net.Listen("tcp", "localhost:20002")
 	if err != nil {
 		panic(err)
 	}
@@ -40,7 +40,9 @@ func TestGetMetadata(t *testing.T) {
 		if v, ok := r.URL.Query()["recursive"]; !ok || v[0] != "true" {
 			t.Fatal("Expected recursive query")
 		}
-		w.Write(loadTestData("metadata1"))
+		if _, err := w.Write(loadTestData("metadata1")); err != nil {
+			t.Error(err)
+		}
 	})
 	defer ts.Close()
 

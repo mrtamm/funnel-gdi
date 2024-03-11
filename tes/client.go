@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/protobuf/jsonpb"
 	"github.com/ohsu-comp-bio/funnel/util"
 	"golang.org/x/net/context"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // NewClient returns a new HTTP client for accessing
@@ -52,7 +52,7 @@ func NewClient(address string) (*Client, error) {
 type Client struct {
 	address   string
 	client    *http.Client
-	Marshaler *jsonpb.Marshaler
+	Marshaler *protojson.MarshalOptions
 	User      string
 	Password  string
 	Bearer    string
@@ -70,8 +70,7 @@ func (c *Client) setAuth(hreq *http.Request) {
 func (c *Client) GetTask(ctx context.Context, req *GetTaskRequest) (*Task, error) {
 	// Send request
 	u := c.address + "/v1/tasks/" + req.Id + "?view=" + req.View.String()
-	hreq, _ := http.NewRequest("GET", u, nil)
-	hreq.WithContext(ctx)
+	hreq, _ := http.NewRequestWithContext(ctx, "GET", u, nil)
 	c.setAuth(hreq)
 	body, err := util.CheckHTTPResponse(c.client.Do(hreq))
 	if err != nil {
@@ -79,7 +78,7 @@ func (c *Client) GetTask(ctx context.Context, req *GetTaskRequest) (*Task, error
 	}
 	// Parse response
 	resp := &Task{}
-	err = jsonpb.UnmarshalString(string(body), resp)
+	err = Unmarshaler.Unmarshal(body, resp)
 	if err != nil {
 		return nil, err
 	}
@@ -104,8 +103,7 @@ func (c *Client) ListTasks(ctx context.Context, req *ListTasksRequest) (*ListTas
 
 	// Send request
 	u := c.address + "/v1/tasks?" + v.Encode()
-	hreq, _ := http.NewRequest("GET", u, nil)
-	hreq.WithContext(ctx)
+	hreq, _ := http.NewRequestWithContext(ctx, "GET", u, nil)
 	c.setAuth(hreq)
 	body, err := util.CheckHTTPResponse(c.client.Do(hreq))
 	if err != nil {
@@ -113,7 +111,7 @@ func (c *Client) ListTasks(ctx context.Context, req *ListTasksRequest) (*ListTas
 	}
 	// Parse response
 	resp := &ListTasksResponse{}
-	err = jsonpb.UnmarshalString(string(body), resp)
+	err = Unmarshaler.Unmarshal(body, resp)
 	if err != nil {
 		return nil, err
 	}
@@ -127,16 +125,14 @@ func (c *Client) CreateTask(ctx context.Context, task *Task) (*CreateTaskRespons
 		return nil, fmt.Errorf("invalid task message: %v", verr)
 	}
 
-	var b bytes.Buffer
-	err := Marshaler.Marshal(&b, task)
+	b, err := Marshaler.Marshal(task)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling task message: %v", err)
 	}
 
 	// Send request
 	u := c.address + "/v1/tasks"
-	hreq, _ := http.NewRequest("POST", u, &b)
-	hreq.WithContext(ctx)
+	hreq, _ := http.NewRequestWithContext(ctx, "POST", u, bytes.NewBuffer(b))
 	hreq.Header.Add("Content-Type", "application/json")
 	c.setAuth(hreq)
 	body, err := util.CheckHTTPResponse(c.client.Do(hreq))
@@ -146,7 +142,7 @@ func (c *Client) CreateTask(ctx context.Context, task *Task) (*CreateTaskRespons
 
 	// Parse response
 	resp := &CreateTaskResponse{}
-	err = jsonpb.UnmarshalString(string(body), resp)
+	err = Unmarshaler.Unmarshal(body, resp)
 	if err != nil {
 		return nil, err
 	}
@@ -156,8 +152,7 @@ func (c *Client) CreateTask(ctx context.Context, task *Task) (*CreateTaskRespons
 // CancelTask POSTs to /v1/tasks/{id}:cancel
 func (c *Client) CancelTask(ctx context.Context, req *CancelTaskRequest) (*CancelTaskResponse, error) {
 	u := c.address + "/v1/tasks/" + req.Id + ":cancel"
-	hreq, _ := http.NewRequest("POST", u, nil)
-	hreq.WithContext(ctx)
+	hreq, _ := http.NewRequestWithContext(ctx, "POST", u, nil)
 	hreq.Header.Add("Content-Type", "application/json")
 	c.setAuth(hreq)
 	body, err := util.CheckHTTPResponse(c.client.Do(hreq))
@@ -167,7 +162,7 @@ func (c *Client) CancelTask(ctx context.Context, req *CancelTaskRequest) (*Cance
 
 	// Parse response
 	resp := &CancelTaskResponse{}
-	err = jsonpb.UnmarshalString(string(body), resp)
+	err = Unmarshaler.Unmarshal(body, resp)
 	if err != nil {
 		return nil, err
 	}
@@ -177,8 +172,7 @@ func (c *Client) CancelTask(ctx context.Context, req *CancelTaskRequest) (*Cance
 // GetServiceInfo returns result of GET /v1/tasks/service-info
 func (c *Client) GetServiceInfo(ctx context.Context, req *ServiceInfoRequest) (*ServiceInfo, error) {
 	u := c.address + "/v1/tasks/service-info"
-	hreq, _ := http.NewRequest("GET", u, nil)
-	hreq.WithContext(ctx)
+	hreq, _ := http.NewRequestWithContext(ctx, "GET", u, nil)
 	c.setAuth(hreq)
 	body, err := util.CheckHTTPResponse(c.client.Do(hreq))
 	if err != nil {
@@ -187,7 +181,7 @@ func (c *Client) GetServiceInfo(ctx context.Context, req *ServiceInfoRequest) (*
 
 	// Parse response
 	resp := &ServiceInfo{}
-	err = jsonpb.UnmarshalString(string(body), resp)
+	err = Unmarshaler.Unmarshal(body, resp)
 	if err != nil {
 		return nil, err
 	}

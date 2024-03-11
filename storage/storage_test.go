@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -120,12 +119,12 @@ func TestUrlParsing(t *testing.T) {
 		t.Error("wrong key")
 	}
 
-	url, err = b.parse("gs://1000genomes/README.analysis_history")
+	_, err = b.parse("gs://1000genomes/README.analysis_history")
 	if _, ok := err.(*ErrUnsupportedProtocol); !ok {
 		t.Error("expected ErrUnsupportedProtocol")
 	}
 
-	url, err = b.parse("s3://")
+	_, err = b.parse("s3://")
 	if _, ok := err.(*ErrInvalidURL); !ok {
 		t.Error("expected ErrInvalidURL")
 	}
@@ -181,12 +180,12 @@ func TestUrlParsing(t *testing.T) {
 		t.Error("wrong key")
 	}
 
-	url, _, err = ab.parse("gs://1000genomes/README.analysis_history")
+	_, _, err = ab.parse("gs://1000genomes/README.analysis_history")
 	if _, ok := err.(*ErrUnsupportedProtocol); !ok {
 		t.Error("expected ErrUnsupportedProtocol")
 	}
 
-	url, _, err = ab.parse("s3://")
+	_, _, err = ab.parse("s3://")
 	if _, ok := err.(*ErrInvalidURL); !ok {
 		t.Error("expected ErrInvalidURL")
 	}
@@ -212,12 +211,12 @@ func TestUrlParsing(t *testing.T) {
 		t.Error("wrong key")
 	}
 
-	url, err = gb.parse("s3://1000genomes/README.analysis_history")
+	_, err = gb.parse("s3://1000genomes/README.analysis_history")
 	if _, ok := err.(*ErrUnsupportedProtocol); !ok {
 		t.Error("expected ErrUnsupportedProtocol")
 	}
 
-	url, err = gb.parse("gs://")
+	_, err = gb.parse("gs://")
 	if _, ok := err.(*ErrInvalidURL); !ok {
 		t.Error("expected ErrInvalidURL")
 	}
@@ -240,19 +239,19 @@ func TestUrlParsing(t *testing.T) {
 		t.Error("wrong key")
 	}
 
-	url, err = sb.parse("s3://1000genomes/README.analysis_history")
+	_, err = sb.parse("s3://1000genomes/README.analysis_history")
 	if _, ok := err.(*ErrUnsupportedProtocol); !ok {
 		t.Error("expected ErrUnsupportedProtocol")
 	}
 
-	url, err = sb.parse("swift://")
+	_, err = sb.parse("swift://")
 	if _, ok := err.(*ErrInvalidURL); !ok {
 		t.Error("expected ErrInvalidURL")
 	}
 }
 
 func TestWalkFiles(t *testing.T) {
-	tmp, err := ioutil.TempDir("", "funnel-test-local-storage")
+	tmp, err := os.MkdirTemp("", "funnel-test-local-storage")
 	if err != nil {
 		t.Fatal(err)
 	}

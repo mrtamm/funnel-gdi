@@ -2,6 +2,7 @@ package run
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 
 	"github.com/kballard/go-shellquote"
@@ -20,11 +21,7 @@ var Cmd = &cobra.Command{
 	Use:   "run 'CMD' [flags]",
 	Short: "Run a task.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := Run(args)
-		if err != nil {
-			//cmd.Usage()
-		}
-		return err
+		return Run(args)
 	},
 	DisableFlagParsing: true,
 }
@@ -116,7 +113,9 @@ func scatter(base flagVals) []flagVals {
 			// Per-scatter flags
 			sp, _ := shellquote.Split(scanner.Text())
 			tv := base
-			parseTaskArgs(&tv, sp)
+			if err := parseTaskArgs(&tv, sp); err != nil {
+				fmt.Printf("Failed to parse task args: %s\n", err)
+			}
 			// Parse scatter file flags into new flagVals
 			out = append(out, tv)
 		}

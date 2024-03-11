@@ -10,18 +10,18 @@ import (
 
 var examples = buildExamples()
 
-func buildExamples() map[string]string {
-	examples := map[string]string{}
+func buildExamples() map[string][]byte {
+	examples := map[string][]byte{}
 	for _, n := range intern.AssetNames() {
 		sn := path.Base(n)
 		sn = strings.TrimSuffix(sn, path.Ext(sn))
 		b := intern.MustAsset(n)
-		examples[sn] = string(b)
+		examples[sn] = b
 	}
 	return examples
 }
 
 // Examples returns a set of example tasks.
-func Examples() map[string]string {
+func Examples() map[string][]byte {
 	return examples
 }

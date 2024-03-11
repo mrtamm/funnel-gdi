@@ -64,6 +64,21 @@ func testEmptyTask(t *testing.T, p Predicate, name string) {
 	}()
 
 	j := &tes.Task{}
-	w := &Node{}
-	p(j, w)
+	w := &Node{
+		Id: "test-node",
+		Resources: &Resources{
+			Cpus:   1.0,
+			RamGb:  1.0,
+			DiskGb: 1.0,
+		},
+		Available: &Resources{
+			Cpus:   1.0,
+			RamGb:  1.0,
+			DiskGb: 1.0,
+		},
+	}
+
+	if err := p(j, w); err != nil {
+		t.Error(err)
+	}
 }

@@ -1,15 +1,14 @@
 package elastic
 
 import (
-	"bytes"
 	"fmt"
 
-	"github.com/golang/protobuf/jsonpb"
 	"github.com/ohsu-comp-bio/funnel/compute/scheduler"
 	"github.com/ohsu-comp-bio/funnel/tes"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/encoding/protojson"
 	elastic "gopkg.in/olivere/elastic.v5"
 )
 
@@ -33,7 +32,7 @@ func (es *Elastic) ReadQueue(n int) []*tes.Task {
 	var tasks []*tes.Task
 	for _, hit := range res.Hits.Hits {
 		t := &tes.Task{}
-		err := jsonpb.Unmarshal(bytes.NewReader(*hit.Source), t)
+		err := protojson.Unmarshal(*hit.Source, t)
 		if err != nil {
 			continue
 		}
@@ -54,14 +53,14 @@ func (es *Elastic) GetNode(ctx context.Context, req *scheduler.GetNodeRequest) (
 		Do(ctx)
 
 	if elastic.IsNotFound(err) {
-		return nil, grpc.Errorf(codes.NotFound, fmt.Sprintf("%v: nodeID: %s", err.Error(), req.Id))
+		return nil, status.Errorf(codes.NotFound, fmt.Sprintf("%v: nodeID: %s", err.Error(), req.Id))
 	}
 	if err != nil {
 		return nil, err
 	}
 
 	node := &scheduler.Node{}
-	err = jsonpb.Unmarshal(bytes.NewReader(*res.Source), node)
+	err = protojson.Unmarshal(*res.Source, node)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +93,9 @@ func (es *Elastic) PutNode(ctx context.Context, node *scheduler.Node) (*schedule
 
 	existing := &scheduler.Node{}
 	if err == nil {
-		jsonpb.Unmarshal(bytes.NewReader(*res.Source), existing)
+		if err2 := protojson.Unmarshal(*res.Source, existing); err2 != nil {
+			fmt.Printf("Detected error while unmarshaling node info from HTTP response: %s\n", err2)
+		}
 	}
 
 	err = scheduler.UpdateNode(ctx, es, node, existing)
@@ -102,8 +103,8 @@ func (es *Elastic) PutNode(ctx context.Context, node *scheduler.Node) (*schedule
 		return nil, err
 	}
 
-	mar := jsonpb.Marshaler{}
-	s, err := mar.MarshalToString(node)
+	mar := protojson.MarshalOptions{}
+	b, err := mar.Marshal(node)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +114,7 @@ func (es *Elastic) PutNode(ctx context.Context, node *scheduler.Node) (*schedule
 		Type("node").
 		Id(node.Id).
 		Refresh("true").
-		BodyString(s)
+		BodyString(string(b))
 
 	if node.GetVersion() != 0 {
 		i = i.Version(node.GetVersion())
@@ -151,7 +152,7 @@ func (es *Elastic) ListNodes(ctx context.Context, req *scheduler.ListNodesReques
 	resp := &scheduler.ListNodesResponse{}
 	for _, hit := range res.Hits.Hits {
 		node := &scheduler.Node{}
-		err = jsonpb.Unmarshal(bytes.NewReader(*hit.Source), node)
+		err = protojson.Unmarshal(*hit.Source, node)
 		if err != nil {
 			return nil, err
 		}

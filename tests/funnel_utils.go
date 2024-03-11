@@ -3,7 +3,6 @@ package tests
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -300,14 +299,14 @@ func (f *Funnel) WaitForExec(id string, i int) {
 
 // Tempdir returns a new temporary directory path
 func (f *Funnel) Tempdir() string {
-	d, _ := ioutil.TempDir(f.StorageDir, "")
+	d, _ := os.MkdirTemp(f.StorageDir, "")
 	d, _ = filepath.Abs(d)
 	return d
 }
 
 // WriteFile writes a file to the local (temporary) storage directory.
 func (f *Funnel) WriteFile(name string, content string) {
-	err := ioutil.WriteFile(f.StorageDir+"/"+name, []byte(content), os.ModePerm)
+	err := os.WriteFile(f.StorageDir+"/"+name, []byte(content), os.ModePerm)
 	if err != nil {
 		panic(err)
 	}
@@ -315,7 +314,7 @@ func (f *Funnel) WriteFile(name string, content string) {
 
 // ReadFile reads a file to the local (temporary) storage directory.
 func (f *Funnel) ReadFile(name string) string {
-	b, err := ioutil.ReadFile(f.StorageDir + "/" + name)
+	b, err := os.ReadFile(f.StorageDir + "/" + name)
 	if err != nil {
 		panic(err)
 	}
@@ -410,7 +409,7 @@ func (f *Funnel) StartServerInDocker(containerName, imageName string, extraArgs 
 
 func (f *Funnel) findTestServerContainers() []string {
 	res := []string{}
-	containers, err := f.Docker.ContainerList(context.Background(), dockerTypes.ContainerListOptions{})
+	containers, err := f.Docker.ContainerList(context.Background(), container.ListOptions{})
 	if err != nil {
 		panic(err)
 	}

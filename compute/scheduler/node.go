@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
@@ -55,7 +56,7 @@ type NodeProcess struct {
 	conf      config.Config
 	client    Client
 	log       *logger.Logger
-	resources Resources
+	resources *Resources
 	workerRun Worker
 	workers   *runSet
 	timeout   util.IdleTimeout
@@ -98,7 +99,10 @@ func (n *NodeProcess) Run(ctx context.Context) {
 			n.client.Close()
 
 			// The workers get 10 seconds to finish up.
-			n.workers.Wait(time.Second * 10)
+			if err := n.workers.Wait(time.Second * 10); err != nil {
+				fmt.Printf("Detected error while waiting for works to finish "+
+					"within 10 seconds: %s\n", err)
+			}
 			return
 
 		case <-ticker.C:
@@ -112,12 +116,11 @@ func (n *NodeProcess) Run(ctx context.Context) {
 func (n *NodeProcess) checkConnection(ctx context.Context) {
 	_, err := n.client.GetNode(ctx, &GetNodeRequest{Id: n.conf.Node.ID})
 
-	// If its a 404 error create a new node
 	s, _ := status.FromError(err)
-	if s.Code() != codes.NotFound {
-		n.log.Error("Couldn't contact server.", err)
-	} else {
+	if s.Code() == codes.OK {
 		n.log.Info("Successfully connected to server.")
+	} else {
+		n.log.Error("Couldn't contact server: code="+s.Code().String(), err)
 	}
 }
 
@@ -125,7 +128,8 @@ func (n *NodeProcess) checkConnection(ctx context.Context) {
 // handles signals from the server (new task, cancel task, etc), reports resources, etc.
 //
 // TODO Sync should probably use a channel to sync data access.
-//      Probably only a problem for test code, where Sync is called directly.
+//
+//	Probably only a problem for test code, where Sync is called directly.
 func (n *NodeProcess) sync(ctx context.Context) {
 	var r *Node
 	var err error
@@ -135,7 +139,7 @@ func (n *NodeProcess) sync(ctx context.Context) {
 		// If its a 404 error create a new node
 		s, _ := status.FromError(err)
 		if s.Code() != codes.NotFound {
-			n.log.Error("Couldn't get node state during sync.", err)
+			n.log.Error("Couldn't get node state during sync: code="+s.Code().String(), err)
 			return
 		}
 		n.log.Info("Starting initial node sync")
@@ -169,7 +173,7 @@ func (n *NodeProcess) sync(ctx context.Context) {
 
 	_, err = n.client.PutNode(context.Background(), &Node{
 		Id:        n.conf.Node.ID,
-		Resources: &n.resources,
+		Resources: n.resources,
 		State:     n.state,
 		Version:   r.GetVersion(),
 		Metadata:  meta,

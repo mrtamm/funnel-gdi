@@ -25,5 +25,7 @@ func TestFormatNilProtoField(t *testing.T) {
 		"ns":        "TEST",
 		"nil value": nt,
 	})
-	tf.Format(entry)
+	if _, err := tf.Format(entry); err != nil {
+		t.Error(err)
+	}
 }
