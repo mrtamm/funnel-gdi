@@ -63,48 +63,14 @@ func (b *HTSGET) Put(ctx context.Context, url, path string) (*Object, error) {
 
 // Get copies a file from a given URL to the host path.
 //
-// Supports fetching "*.c4gh" encrypted files. If the `path“ does not end with
-// "*.c4gh", the content will be also decrypted. Otherwise, the private key for
-// decrypting, will be located in `.private.key`.
+// If configuration specifies sending a public key, the received content will
+// be also decrypted locally before writing to the file.
 func (b *HTSGET) Get(ctx context.Context, url, path string) (*Object, error) {
-	httpsUrl := strings.Replace(url, protocol, "https://", 1)
-	cmdArgs := make([]string, 0)
-	tmpPath := path
+	htsgetArgs := htsgetArgs(url, b.conf.Protocol, b.conf.SendPublicKey)
+	cmd1, cmd2 := htsgetCmds(htsgetArgs, b.conf.SendPublicKey)
+	cmdPipe(cmd1, cmd2, path)
 
-	if strings.HasPrefix(url, protocolBearer) {
-		bearerStart := len(protocolBearer)
-		bearerStop := strings.Index(url, "@")
-
-		if bearerStop < 1 {
-			return nil, fmt.Errorf("Bearer token not terminated by @")
-		}
-
-		httpsUrl = "https://" + url[bearerStop+1:]
-		cmdArgs = append(cmdArgs, "--bearer-token", url[bearerStart:bearerStop])
-	}
-
-	if strings.HasSuffix(url, ".c4gh") {
-		cmdArgs = append(cmdArgs, "--headers", createHtsgetHeader())
-		if !strings.HasSuffix(path, ".c4gh") {
-			tmpPath = path + ".tmp"
-		}
-	}
-
-	cmdArgs = append(cmdArgs, "--output", path)
-	cmdArgs = append(cmdArgs, httpsUrl)
-
-	err := runCmd("htsget", cmdArgs...)
-	if err != nil {
-		return nil, err
-	}
-
-	if tmpPath != path {
-		err = decrypt(tmpPath, path)
-		if err != nil {
-			return nil, err
-		}
-	}
-
+	// Check that the destination file exists:
 	info, err := os.Stat(path)
 	if err != nil {
 		return nil, err
@@ -141,7 +107,28 @@ func (b *HTSGET) supportsPrefix(url string) error {
 	return nil
 }
 
-func createHtsgetHeader() string {
+func htsgetUrl(url, useProtocol string) (updatedUrl string, token string) {
+	if useProtocol == "" {
+		useProtocol = "https"
+	}
+	useProtocol += "://"
+	updatedUrl = strings.Replace(url, protocol, useProtocol, 1)
+
+	// Optional info: parse the "token" from "htsget://bearer:token@host..."
+	if strings.HasPrefix(url, protocolBearer) {
+		bearerStart := len(protocolBearer)
+		bearerStop := strings.Index(url, "@")
+
+		if bearerStop > bearerStart {
+			updatedUrl = useProtocol + url[bearerStop+1:]
+			token = url[bearerStart:bearerStop]
+		}
+	}
+
+	return
+}
+
+func htsgetHeader() string {
 	ensureKeyFiles()
 
 	file, err := os.Open(publicKeyFile)
@@ -150,14 +137,23 @@ func createHtsgetHeader() string {
 		panic(1)
 	}
 
+	publicKey := ""
 	scanner := bufio.NewScanner(file)
-	scanner.Text()              // Skip header.
-	publicKey := scanner.Text() // The key is on the second line.
+	if scanner.Scan() { // Skip one header line.
+		if scanner.Scan() {
+			publicKey = scanner.Text() // The key is on the second line.
+		}
+	}
 	file.Close()
 
 	// HTTP headers to be encoded as JSON:
 	headers := make(map[string]string)
-	headers["client-public-key"] = publicKey
+
+	if publicKey == "" {
+		fmt.Println("[WARN] Could not read public key (second line) from", publicKeyFile, "file.")
+	} else {
+		headers["client-public-key"] = publicKey
+	}
 
 	headersJson, err := json.Marshal(&headers)
 	if err != nil {
@@ -166,6 +162,34 @@ func createHtsgetHeader() string {
 	}
 
 	return string(headersJson)
+}
+
+func htsgetArgs(url, useProtocol string, decrypt bool) []string {
+	httpsUrl, token := htsgetUrl(url, useProtocol)
+	cmdArgs := make([]string, 0)
+
+	if len(token) > 0 {
+		cmdArgs = append(cmdArgs, "--bearer-token", token)
+	}
+
+	if decrypt {
+		cmdArgs = append(cmdArgs, "--headers", htsgetHeader())
+	}
+
+	cmdArgs = append(cmdArgs, httpsUrl)
+	return cmdArgs
+}
+
+func htsgetCmds(htsgetArgs []string, decrypt bool) (cmd1, cmd2 *exec.Cmd) {
+	cmd1 = exec.Command("htsget", htsgetArgs...)
+
+	if decrypt {
+		cmd2 = exec.Command("crypt4gh", "decrypt", "--sk", privateKeyFile)
+	} else {
+		cmd2 = exec.Command("cat")
+	}
+
+	return
 }
 
 func ensureKeyFiles() {
@@ -187,6 +211,8 @@ func ensureKeyFiles() {
 		if err != nil {
 			fmt.Println("Could not generate crypt4gh key-files:", err)
 			panic(1)
+		} else {
+			fmt.Println("[INFO] Generated crypt4gh key-pair.")
 		}
 	}
 }
@@ -207,49 +233,71 @@ func runCmd(commandName string, commandArgs ...string) error {
 	return err
 }
 
-func decrypt(encryptedFile, decryptedFile string) error {
-	encryptedReader, err := os.Open(encryptedFile)
-	if err != nil {
-		return err
-	}
-	defer encryptedReader.Close()
-	defer os.Remove(encryptedFile)
-
-	var stderr bytes.Buffer
-
-	cmd := exec.Command("crypt4gh", "--sk", privateKeyFile)
-	cmd.Stdin = encryptedReader
-	cmd.Stderr = &stderr
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		fmt.Println("[FATAL] Failed to obtain STDOUT pipe for crypt4gh (decryption):", err)
-		panic(1)
-	}
-
-	err = cmd.Start()
-	if err != nil {
-		fmt.Println("[ERROR] Failed to execute crypt4gh (decryption):", err)
-		return err
-	}
-
-	writer, err := os.Open(decryptedFile)
-	if err != nil {
-		fmt.Println("[ERROR] Failed to open file for decryption:", decryptedFile, err)
-		return err
-	}
-	defer writer.Close()
-
-	_, err = io.Copy(writer, stdout)
-	if err != nil {
-		fmt.Println("[ERROR] Failed to copy decrypted content to", decryptedFile, ":", err)
-		return err
-	}
-
+func cmdFailed(cmd *exec.Cmd, stderr *bytes.Buffer) bool {
+	fmt.Println("Waiting for ", cmd.Path)
 	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("Error while decrypting the content (crypt4gh): %v\nSTDERR: %s",
-			err, stderr.String())
+		fmt.Printf("[ERROR] `%s` command failed: %v\n", cmd.Path, err)
+		if stderr.Len() > 0 {
+			fmt.Println("Output from STDERR:")
+			fmt.Print(stderr.String())
+		}
+		return true
+	} else {
+		fmt.Println("Waiting done ")
+		return false
+	}
+}
+
+func cmdPipe(cmd1, cmd2 *exec.Cmd, destFilePath string) {
+	fw, err := os.Create(destFilePath)
+	if err != nil {
+		fmt.Println("[ERROR] Failed to create file for saving content:", destFilePath, err)
+		return
+	}
+	defer fw.Close()
+
+	// Output from cmd1 goes to cmd2, and output from cmd2 goes to the file.
+	stderr1 := new(bytes.Buffer)
+	stderr2 := new(bytes.Buffer)
+	r, w := io.Pipe()
+
+	if err != nil {
+		fmt.Printf("[ERROR] failed to create OS pipe: %v", err)
+		return
 	}
 
-	return nil
+	cmd1.Stdout = w
+	cmd1.Stderr = stderr1
+
+	cmd2.Stdin = r
+	cmd2.Stdout = fw
+	cmd2.Stderr = stderr2
+
+	if err := cmd1.Start(); err != nil {
+		fmt.Printf("[ERROR] failed to run `%s` command: %v", cmd1.Path, err)
+		return
+	}
+
+	if err := cmd2.Start(); err != nil {
+		fmt.Printf("[ERROR] failed to run `%s` command: %v", cmd2.Path, err)
+		return
+	}
+
+	fmt.Println("cmd1:", cmd1.String())
+	fmt.Println("cmd2:", cmd2.String())
+	fmt.Println("dest:", destFilePath)
+
+	if cmdFailed(cmd1, stderr1) {
+		fw.Close()
+		os.Remove(destFilePath)
+	}
+
+	w.Close()
+
+	if cmdFailed(cmd2, stderr2) {
+		fw.Close()
+		os.Remove(destFilePath)
+	}
+
+	r.Close()
 }
