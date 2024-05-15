@@ -42,7 +42,7 @@ Server:
   # OidcAuth:
   #   # URL of the OIDC service configuration:
   #   ServiceConfigUrl: ""
-  #   # Client ID and secret are sent with the token introspection request 
+  #   # Client ID and secret are sent with the token introspection request
   #   # (Basic authentication):
   #   ClientId:
   #   ClientSecret:
@@ -313,7 +313,7 @@ AWSBatch:
 # Kubernetes describes the configuration for the Kubernetes compute backend.
 Kubernetes:
   # The executor used to execute tasks. Available executors: docker, kubernetes
-  Executor: "docker" 
+  Executor: "docker"
   # Turn off task state reconciler. When enabled, Funnel communicates with Kubernetes
   # to find tasks that are stuck in a queued state or errored and
   # updates the task state accordingly.
@@ -392,3 +392,8 @@ FTPStorage:
   Timeout: 10s
   User: "anonymous"
   Password: "anonymous"
+
+HTSGETStorage:
+  Disabled: false
+  Protocol: https
+  SendPublicKey: false
