@@ -393,13 +393,13 @@ func (h FTPStorage) Valid() bool {
 // HTSGETStorage configures the http storage backend.
 type HTSGETStorage struct {
 	Disabled bool
-	// Timeout duration for http GET calls
-	Timeout  Duration
-	User     string
-	Password string
+	// Actual protocol for fetching the resource (defaults to 'https')
+	Protocol string
+	// Whether Funnel should generate and send its crypt4gh public key (default: false)
+	SendPublicKey bool
 }
 
-// Valid validates the FTPStorage configuration.
+// Valid validates the HTSGETStorage configuration.
 func (h HTSGETStorage) Valid() bool {
 	return !h.Disabled
 }
