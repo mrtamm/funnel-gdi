@@ -50,12 +50,12 @@ HTSGETStorage:
 {
   "name": "Hello world",
   "inputs": [{
-    "url": "htsget://fakedomain.com/variants/genome2341?referenceName=1&start=10000&end=20000",
+    "url": "htsget://htsget-server/variants/genome2341?referenceName=1&start=10000&end=20000",
     "path": "/inputs/genome.vcf.gz"
   }],
   "outputs": [{
-    "url": "file:///path/to/funnel-data/output.txt",
-    "path": "/outputs/out.txt"
+    "url": "file:///results/line_count.txt",
+    "path": "/outputs/line_count.txt"
   }],
   "executors": [{
     "image": "alpine",
@@ -64,7 +64,7 @@ HTSGETStorage:
       "-c",
       "zcat /inputs/genome.vcf.gz | wc -l"
     ],
-    "stdout": "/outputs/out.txt",
+    "stdout": "/outputs/line_count.txt"
   }]
 }
 ```

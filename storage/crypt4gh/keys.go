@@ -14,6 +14,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/ohsu-comp-bio/funnel/logger"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/crypto/pbkdf2"
@@ -24,6 +25,7 @@ const privateKeyMagic = "c4gh-v1"
 const presumedDirName = ".c4gh"
 
 var base64Decoder *base64.Encoding = base64.StdEncoding.WithPadding(base64.StdPadding)
+var log = logger.NewLogger("crypt4gh", logger.DefaultConfig())
 
 type Crypt4ghKeyPair struct {
 	publicKey []byte
@@ -287,13 +289,13 @@ func readKeyFile(path, keyType string) ([]byte, error) {
 		return nil, errors.Join(errors.New("Failed to decode the Base64 string in the Crypt4gh key file"), err)
 	}
 
-	fmt.Println("Reading Crypt4gh", keyType, "key from file", path)
+	log.Debug(fmt.Sprint("Reading Crypt4gh", keyType, "key from file", path))
 
 	return b, checkLine(r, expectFooter)
 }
 
 func saveKeyFile(path, keyType string, data []byte) error {
-	fmt.Println("Saving Crypt4gh", keyType, "key to file", path)
+	log.Debug(fmt.Sprint("Saving Crypt4gh", keyType, "key to file", path))
 	header, footer := getKeyFileHeaderFooter(keyType)
 
 	content := bytes.NewBufferString(header)

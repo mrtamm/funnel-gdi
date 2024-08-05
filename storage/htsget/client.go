@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -62,6 +63,11 @@ func (hc *HtsgetClient) DownloadTo(destFile string) error {
 	}
 
 	tempFile, err := fileInfo.downloadPartsToTempFile(hc.Timeout)
+	if err != nil {
+		return err
+	}
+
+	err = os.MkdirAll(path.Dir(destFile), 0700)
 	if err != nil {
 		return err
 	}
@@ -130,7 +136,7 @@ func (hc *HtsgetClient) decryptFile(tempFile, destFile string) error {
 
 	defer tempStream.Close()
 
-	destStream, err := os.OpenFile(destFile, os.O_WRONLY, 0400)
+	destStream, err := os.Create(destFile)
 	if err != nil {
 		return errors.Join(fmt.Errorf("Failed to write to the target file: %s", destFile), err)
 	}
@@ -189,7 +195,7 @@ func (hu *HtsgetUrl) copyFromData(dst io.Writer) error {
 		return fmt.Errorf("Received invalid data-URL: [%s...] (comma-separator not found)", url[:20])
 	}
 
-	content := url[contentSepPos:]
+	content := url[contentSepPos+1:]
 	if len(content) == 0 {
 		return nil
 	}
@@ -236,6 +242,6 @@ func (hu *HtsgetUrl) copyFromHttp(dst io.Writer, timeout time.Duration) error {
 			"HTTP [%d] content-type [%s]", resp.StatusCode, contentType)
 	}
 
-	_, err = io.Copy(dst, resp.Request.Body)
+	_, err = io.Copy(dst, resp.Body)
 	return err
 }

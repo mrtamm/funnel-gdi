@@ -49,13 +49,15 @@ func (c *Crypt4gh) Read(buffer []byte) (n int, err error) {
 	var start, end int
 
 	for amount > 0 {
-		c.applyEditListSkip()
-
 		for c.dataBlockPos >= len(c.dataBlock) {
 			err = c.decryptDataBlock()
 			if err != nil {
-				return 0, err
+				if n > 0 {
+					return n, nil
+				}
+				return n, err
 			}
+			c.applyEditListSkip()
 		}
 
 		start, end, amount = c.updateDataBlockRange(amount)
@@ -160,9 +162,9 @@ func (c *Crypt4gh) readHeaderPacket() error {
 	}
 
 	if headerEncryptionMethod != 0 {
-		fmt.Printf("Unrecognized header packet encryption method value (%d). "+
-			"Only 0 (X25519_chacha20_ietf_poly1305) is supported. "+
-			"Skipping the header packet.", headerEncryptionMethod)
+		log.Warn(fmt.Sprintf("Unrecognized header packet encryption method "+
+			"value (%d). Only 0 (X25519_chacha20_ietf_poly1305) is supported. "+
+			"Skipping the header packet.", headerEncryptionMethod))
 		return nil
 	}
 
@@ -212,6 +214,8 @@ func (c *Crypt4gh) parseHeaderPayload(payload []byte) {
 			c.warnPacket("ChaCha20-IETF-Poly1305 data-key error: %v", errKey)
 		} else {
 			c.dataKeys = append(c.dataKeys, dataKey)
+			log.Debug("Successfully received data encryption keys from the " +
+				"file header")
 		}
 
 	} else if dataEditList {
@@ -224,15 +228,18 @@ func (c *Crypt4gh) parseHeaderPayload(payload []byte) {
 		}
 
 		if len(c.editListLengths) > 0 {
-			c.warnPacket("has more than one edit-list (only one permitted)")
+			c.warnPacket("supplies another edit-list (only one permitted)")
 			return
 		}
 
 		// Read and store the lengths of the edit list
 		for startPos := 8; numberLengths > 0; numberLengths-- {
-			c.editListLengths = append(c.editListLengths, readInt64(payload[startPos:startPos+8]))
+			c.editListLengths = append(c.editListLengths,
+				readInt64(payload[startPos:startPos+8]))
 			startPos += 8
 		}
+
+		log.Debug(fmt.Sprintf("Header defines an edit-list: %v", c.editListLengths))
 
 		// The first length is about skipping a number of bytes
 		c.editListSkip = true
@@ -272,7 +279,7 @@ func (c *Crypt4gh) decryptPacketPayload(encryptedPayloadWithMac, writerPublicKey
 	plaintext, errOpen := aead.Open(nil, nonce, encryptedPayloadWithMac, nil)
 
 	if errOpen != nil {
-		// c.warnPacket("ChaCha20-IETF-Poly1305 deciphering error : %v", errOpen)
+		c.warnPacket("ChaCha20-IETF-Poly1305 deciphering error : %v", errOpen)
 		return nil // This error and the packet payload must be ignored
 	}
 
@@ -298,11 +305,24 @@ func (c *Crypt4gh) decryptDataBlock() error {
 		if errOpen == nil {
 			c.dataBlock = plaintext
 			c.dataBlockPos = 0
+			log.Debug("Successfully decrypted a data block",
+				"data_block_number", c.dataBlockCount,
+			)
 			return nil
+		} else {
+			log.Warn("Failed to decrypt a data block with a key",
+				"data_block_number", c.dataBlockCount,
+				"tried_key_number", i+1,
+				"keys_count", len(c.dataKeys),
+			)
 		}
 	}
 
-	fmt.Println("[WARN] Didn't find a suitable key for deciphering a data block.")
+	log.Warn("Failed to decrypt a data block (tried all keys)",
+		"data_block_number", c.dataBlockCount,
+		"keys_count", len(c.dataKeys),
+	)
+
 	return nil
 }
 
@@ -314,12 +334,16 @@ func (c *Crypt4gh) applyEditListSkip() {
 	remainingAmount := uint64(len(c.dataBlock) - c.dataBlockPos)
 	skipAmount := &c.editListLengths[0]
 
-	if *skipAmount < remainingAmount {
+	if remainingAmount == 0 {
+		return
+	}
+
+	if *skipAmount <= remainingAmount {
 		c.dataBlockPos += int(*skipAmount)
 		*skipAmount = 0
 	} else {
+		c.dataBlockPos += int(remainingAmount)
 		*skipAmount -= remainingAmount
-		c.dataBlockPos = len(c.dataBlock)
 	}
 
 	if *skipAmount == 0 {
@@ -339,7 +363,7 @@ func (c *Crypt4gh) applyEditListKeep(amount, start, end int) (remainingAmount, u
 
 	keepAmount := &c.editListLengths[0]
 
-	if *keepAmount < uint64(rangeLength) {
+	if *keepAmount <= uint64(rangeLength) {
 		rangeLength = int(*keepAmount)
 		updatedEnd = start + rangeLength
 		remainingAmount = amount - rangeLength
@@ -350,16 +374,17 @@ func (c *Crypt4gh) applyEditListKeep(amount, start, end int) (remainingAmount, u
 	if *keepAmount == 0 {
 		c.editListLengths = c.editListLengths[1:]
 		c.editListSkip = true
+		c.applyEditListSkip()
 	}
 
 	return
 }
 
 func (c *Crypt4gh) warnPacket(msg string, args ...any) {
-	fmt.Printf("[WARN] Header packet [%d/%d] %s\n",
+	log.Warn(fmt.Sprintf("Header packet [%d/%d] %s\n",
 		c.headerPacketProcessed,
 		c.headerPacketCount,
-		fmt.Sprintf(msg, args...))
+		fmt.Sprintf(msg, args...)))
 }
 
 func (c *Crypt4gh) readBytes(count uint) ([]byte, error) {
