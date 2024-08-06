@@ -8,8 +8,8 @@ import (
 const encodedPublicKey = "LS0tLS1CRUdJTiBDUllQVDRHSCBQVUJMSUMgS0VZLS0tLS0KQ3N4Mk5KNVhicTJuM3Q4dWdSeTJabGRLYXRoWDRLa0haZ1dzcGhuTTlSbz0KLS0tLS1FTkQgQ1JZUFQ0R0ggUFVCTElDIEtFWS0tLS0tCg=="
 
 func TestLoadingEncryptedKeys(t *testing.T) {
-	os.Setenv("C4GH_PUBLIC_KEY", "testdata/keys/key.pub")
-	os.Setenv("C4GH_SECRET_KEY", "testdata/keys/key.encrypted.sec")
+	os.Setenv("C4GH_PUBLIC_KEY", "testdata/key.pub")
+	os.Setenv("C4GH_SECRET_KEY", "testdata/key.encrypted.sec")
 	os.Setenv("C4GH_PASSPHRASE", "abcDEFghi")
 
 	c4gh, err := ResolveKeyPair()
@@ -26,8 +26,8 @@ func TestLoadingEncryptedKeys(t *testing.T) {
 }
 
 func TestLoadingNonEncryptedKeys(t *testing.T) {
-	os.Setenv("C4GH_PUBLIC_KEY", "testdata/keys/key.pub")
-	os.Setenv("C4GH_SECRET_KEY", "testdata/keys/key.plain.sec")
+	os.Setenv("C4GH_PUBLIC_KEY", "testdata/key.pub")
+	os.Setenv("C4GH_SECRET_KEY", "testdata/key.plain.sec")
 	os.Setenv("C4GH_PASSPHRASE", "to-be-ignored")
 
 	c4gh, err := ResolveKeyPair()

@@ -25,8 +25,8 @@ type Crypt4gh struct {
 	editListSkip          bool
 }
 
-// Reads the magic-number at the beginning of the file to check if the file
-// might be considered a Crypt4gh file.
+// Reads the magic-number and the version number at the beginning of the file
+// to check if the file might be considered to be a supported Crypt4gh file.
 func IsCrypt4ghFile(path string) bool {
 	file, err := os.Open(path)
 	if err != nil {
@@ -35,54 +35,56 @@ func IsCrypt4ghFile(path string) bool {
 
 	defer file.Close()
 
-	magicBuffer := make([]byte, 8)
-	_, err = file.Read(magicBuffer)
-	return err == nil && string(magicBuffer) == "crypt4gh"
+	buffer := make([]byte, 12)
+	_, err = file.Read(buffer)
+
+	return err == nil &&
+		string(buffer[0:8]) == "crypt4gh" &&
+		readInt32(buffer[8:12]) == 1
 }
 
 func (c *Crypt4gh) Read(buffer []byte) (n int, err error) {
-	amount := len(buffer)
-	if amount < 1 {
-		return 0, errors.New("Provided byte buffer has no space")
+	addedCount := 0
+
+	for n < len(buffer) && err == nil {
+		addedCount, err = c.copyTo(buffer[n:])
+		n += addedCount
 	}
 
-	var start, end int
-
-	for amount > 0 {
-		for c.dataBlockPos >= len(c.dataBlock) {
-			err = c.decryptDataBlock()
-			if err != nil {
-				if n > 0 {
-					return n, nil
-				}
-				return n, err
-			}
-			c.applyEditListSkip()
-		}
-
-		start, end, amount = c.updateDataBlockRange(amount)
-		copy(buffer, c.dataBlock[start:end])
-		n += end - start
+	if n > 0 {
+		return n, nil
 	}
 
 	return n, err
 }
 
-func (c *Crypt4gh) updateDataBlockRange(amount int) (int, int, int) {
-	// We can assume here that c.dataBlockPos < len(c.dataBlock)
-	start := c.dataBlockPos
-	end := start + amount
-
-	if end > len(c.dataBlock) {
-		end = len(c.dataBlock)
+func (c *Crypt4gh) copyTo(buffer []byte) (int, error) {
+	err := c.loadDataBlock()
+	if err != nil {
+		return 0, err
 	}
 
-	amount, end = c.applyEditListKeep(amount, start, end)
+	start, end, amount := c.getAvailableRange(len(buffer))
 
-	// Already updates the position though reading has not been performed yet:
+	copy(buffer, c.dataBlock[start:end])
+
 	c.dataBlockPos = end
 
-	return start, end, amount
+	return amount, nil
+}
+
+func (c *Crypt4gh) loadDataBlock() error {
+	c.applyEditListSkip()
+
+	// Load next unprocessed block, and skip bytes defined in the edit-list:
+	for c.dataBlockPos >= len(c.dataBlock) {
+		err := c.decryptDataBlock()
+		if err != nil {
+			return err
+		}
+		c.applyEditListSkip()
+	}
+	return nil
 }
 
 func (c *Crypt4gh) readHeader() error {
@@ -352,32 +354,33 @@ func (c *Crypt4gh) applyEditListSkip() {
 	}
 }
 
-func (c *Crypt4gh) applyEditListKeep(amount, start, end int) (remainingAmount, updatedEnd int) {
-	rangeLength := end - start
-	remainingAmount = amount - rangeLength
-	updatedEnd = end
+func (c *Crypt4gh) getAvailableRange(amount int) (start, end, providedAmount int) {
+	providedAmount = amount
 
-	if c.editListSkip || len(c.editListLengths) == 0 {
-		return
+	if c.dataBlockPos+providedAmount > len(c.dataBlock) {
+		providedAmount = len(c.dataBlock) - c.dataBlockPos
 	}
 
-	keepAmount := &c.editListLengths[0]
+	// apply Edit-List:
+	if len(c.editListLengths) > 0 && !c.editListSkip {
+		keepAmount := &c.editListLengths[0]
 
-	if *keepAmount <= uint64(rangeLength) {
-		rangeLength = int(*keepAmount)
-		updatedEnd = start + rangeLength
-		remainingAmount = amount - rangeLength
+		// Reduce the available amount of bytes to read, if necessary
+		if *keepAmount < uint64(providedAmount) {
+			providedAmount = int(*keepAmount)
+		}
+
+		// Reduce the amount of bytes to keep (in the edit list):
+		*keepAmount -= uint64(providedAmount)
+
+		// Switch to edit-list skip-mode, once keep-mode is exhausted:
+		if *keepAmount == 0 {
+			c.editListLengths = c.editListLengths[1:]
+			c.editListSkip = true
+		}
 	}
 
-	*keepAmount -= uint64(rangeLength)
-
-	if *keepAmount == 0 {
-		c.editListLengths = c.editListLengths[1:]
-		c.editListSkip = true
-		c.applyEditListSkip()
-	}
-
-	return
+	return c.dataBlockPos, c.dataBlockPos + providedAmount, providedAmount
 }
 
 func (c *Crypt4gh) warnPacket(msg string, args ...any) {
