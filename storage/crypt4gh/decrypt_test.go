@@ -6,6 +6,8 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"io"
+	"os"
+	"path"
 	"testing"
 
 	"golang.org/x/crypto/blake2b"
@@ -21,6 +23,24 @@ Third line
 
 // Holds the key-pair for encrypting/decrypting the content
 var c4gh, _ = KeyPairFromFiles("testdata/key.pub", "testdata/key.plain.sec", nil)
+
+// Verifies the IsCrypt4ghFile() function.
+func TestIsCrypt4ghFile(t *testing.T) {
+	tempDir := t.TempDir()
+	correctFile := path.Join(tempDir, "correct.c4gh")
+
+	if err := os.WriteFile(correctFile, encryptContent(0, -1).Bytes(), 0600); err != nil {
+		t.Error("Failed to create a test-file")
+	}
+
+	if !IsCrypt4ghFile(correctFile) {
+		t.Error("Failed to recognise the correct Crypt4gh file as valid")
+	}
+
+	if IsCrypt4ghFile(path.Join(tempDir, "unknown.c4gh")) {
+		t.Error("Failed to recognise a non-existent Crypt4gh file as invalid")
+	}
+}
 
 // Encrypts test-data in memory (as it would be in a Crypt4gh file) and then decrypts the content.
 // No edit-list used.
