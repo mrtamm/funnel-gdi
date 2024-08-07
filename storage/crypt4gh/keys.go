@@ -32,6 +32,8 @@ type Crypt4ghKeyPair struct {
 	secretKey []byte
 }
 
+// Produces BASE64-encoded public-key where the key is represented just as in
+// the public-key file.
 func (k *Crypt4ghKeyPair) EncodePublicKeyBase64() string {
 	header, footer := getKeyFileHeaderFooter("PUBLIC")
 
@@ -43,6 +45,8 @@ func (k *Crypt4ghKeyPair) EncodePublicKeyBase64() string {
 	return base64.StdEncoding.EncodeToString(content.Bytes())
 }
 
+// Saves the current key-pair to the specified files. If passphrase is not
+// empty, the private key will be encrypted using the passphrase
 func (k *Crypt4ghKeyPair) Save(publicKeyPath, privateKeyPath string, passphrase []byte) error {
 	err := saveKeyFile(publicKeyPath, "PUBLIC", k.publicKey)
 	if err != nil {
@@ -57,14 +61,16 @@ func (k *Crypt4ghKeyPair) Save(publicKeyPath, privateKeyPath string, passphrase 
 	return saveKeyFile(privateKeyPath, "PRIVATE", encodedKey)
 }
 
-// Decrypts given Crypt4gh file stream (expecting the header part followed by encrypted body).
+// Wraps given reader in order to decrypt the Crypt4gh file stream (expecting
+// the header part followed by encrypted body).
 func (k *Crypt4ghKeyPair) Decrypt(r io.Reader) (io.Reader, error) {
 	c := Crypt4gh{keyPair: k, stream: r}
 	err := c.readHeader()
 	return &c, err
 }
 
-// Decrypts given Crypt4gh file stream (body) using an explicitly provided header information.
+// Returns a reader providing decrypted data for given Crypt4gh file stream
+// (body) and explicit Crypt4gh header information.
 func (k *Crypt4ghKeyPair) DecryptWithHeader(header []byte, body io.Reader) (io.Reader, error) {
 	c := Crypt4gh{keyPair: k, stream: bytes.NewReader(header)}
 	err := c.readHeader()
@@ -179,27 +185,30 @@ func ResolveKeyPair() (*Crypt4ghKeyPair, error) {
 // On failure, it returns an empty string.
 // Look up order is following:
 //
-//  1. When the provided file-path is not empty, use the directory of the key.
-//  2. Fall back to .c4gh/ directory in the current work directory
+//  1. When the provided file-path is not empty, use its directory (even if it
+//     does not exist yet: it will be created).
+//  2. Fall back to .c4gh/ directory in the current directory, if it exists.
 //  3. When user's home-directory can be resolved, fall back to the ~/.c4gh/
-//     directory.
+//     directory (creating it, if missing). When the home-directory cannot be
+//     resolved, fall back to .c4gh/ directory in the current directory.
 //  4. When the directory does not exist and cannot be created, fail by
 //     returning "".
 //
 // To summarise the edge-cases:
-//  1. If no keys are found, they will be created at ~/.c4gh/key[.pub].
-//  2. When the current directory contains the .c4gh directory then that will
+//  1. Explicitly provided paths will be always trusted (if the directories
+//     don't exist yet, they will be created)
+//  2. If no explicit path is provided, keys will be created at
+//     ~/.c4gh/key[.pub]
+//  3. When the current directory contains the .c4gh directory then that will
 //     override the home-directory.
-//  3. explicitly provided paths will be always trusted (without explicitly
-//     checking whether they exist)
 func resolveKeysDir(secretKeyPath string) string {
 	var keysDir string
 
-	if secretKeyPath != "" {
+	if secretKeyPath != "" { // explicit path
 		keysDir = path.Dir(secretKeyPath)
-	} else if isDir(presumedDirName) {
+	} else if isDir(presumedDirName) { // ./.c4gh/
 		keysDir = presumedDirName
-	} else {
+	} else { // attempting ~/.c4gh/
 		var errDir error
 		keysDir, errDir = os.UserHomeDir()
 
@@ -207,7 +216,7 @@ func resolveKeysDir(secretKeyPath string) string {
 			// Place the keys into a private sub-directory:
 			keysDir = path.Join(keysDir, presumedDirName)
 		} else {
-			keysDir = presumedDirName
+			keysDir = presumedDirName // Fall-back: ./.c4gh/
 		}
 	}
 
@@ -215,12 +224,9 @@ func resolveKeysDir(secretKeyPath string) string {
 	directoryExists := isDir(keysDir)
 
 	if !directoryExists {
-		err := os.MkdirAll(keysDir, 0700)
-		directoryExists = err == nil
-	}
-
-	if !directoryExists {
-		keysDir = ""
+		if err := os.MkdirAll(keysDir, 0700); err != nil {
+			return ""
+		}
 	}
 
 	return keysDir
@@ -332,6 +338,10 @@ func checkLine(r io.Reader, line string) error {
 	return nil
 }
 
+// Extract a number of bytes from given list. The length of the bytes to be
+// returned is specified by the first two bytes (big-endian) at the starting
+// position. The second returned int indicates the position after the extracted
+// bytes.
 func readBytes(bytes []byte, startPos int) ([]byte, int) {
 	length := int(bytes[startPos])<<8 | int(bytes[startPos+1])
 	start := startPos + 2
@@ -344,6 +354,7 @@ func readString(bytes []byte, startPos int) (string, int) {
 	return string(b), end
 }
 
+// Returns a two-byte list holding the provided int in big-endian encoding.
 func getLengthBytes(l int) []byte {
 	b := [2]byte{byte(l >> 8), byte(l)}
 	return b[:]
@@ -399,7 +410,7 @@ func decryptPrivateKey(
 	}
 
 	if kdfname == "none" || ciphername == "none" {
-		return nil, fmt.Errorf("Unexpected key encryption information: "+
+		return nil, fmt.Errorf("Invalid key encryption information: "+
 			"kdfname=%s, ciphername=%s", kdfname, ciphername)
 	}
 

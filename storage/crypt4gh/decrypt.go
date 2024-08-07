@@ -12,6 +12,7 @@ import (
 	"golang.org/x/crypto/curve25519"
 )
 
+// Handles Crypt4gh decryption context per source stream.
 type Crypt4gh struct {
 	keyPair               *Crypt4ghKeyPair
 	stream                io.Reader

@@ -24,16 +24,21 @@ default protocol is `https`, which is also presumed in the Htsget
 specification. For testing purposes, it can be changed to `http`.
 
 If the service expects a `Bearer` token, it can be specified in the URL.
-For example: `htsget://bearer:your-token-here@fakedomain.com/...`.
+For example: `htsget://bearer:your-token-here@example.org/...`.
 Here the `bearer:` part is the required syntax to activate the
 `your-token-here` value to be sent to the htsget-service as a header value:
 `Authorization: Bearer your-token-here`.
 
-Funnel always sends its public key in the header of the request to the Htsget
-service. When the Htsget service supports [the content encryption using
-Crypt4gh][htsget-crypt4gh], it can generate a custom Crypt4gh file header where
-the Funnel instance can decrypt and find the symmetric key used for content
-encryption.
+Funnel always sends its public key in the header (`client-public-key`) of the
+request to the Htsget service. When the Htsget service supports [the content
+encryption using Crypt4gh][htsget-crypt4gh], the service can generate a custom
+Crypt4gh file header containing the symmetric key for decrypting the referred
+content (Crypt4gh formatted data-blocks). Funnel checks the beginning of the
+received content to know whether Crypt4gh decryption can be applied. Therefore,
+tasks always receive the data decrypted. For sensitive data, the deployment
+environment (server) should pay attention to restricting access to the Funnel's
+data directories, possibly having separate Funnel instances for different
+data-projects.
 
 Default Htsget Storage configuration should be sufficient for most cases:
 

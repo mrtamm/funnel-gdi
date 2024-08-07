@@ -62,7 +62,7 @@ func TestGeneratingAndSavingNewKeys(t *testing.T) {
 
 	err = c4gh.Save(pubPath, secPath, nil)
 	if err != nil {
-		t.Error("Could not generate a Crypt4gh key-pair", err)
+		t.Error("Could not save a Crypt4gh key-pair to file", err)
 	}
 
 	os.Remove(pubPath)
@@ -70,11 +70,11 @@ func TestGeneratingAndSavingNewKeys(t *testing.T) {
 
 	err = c4gh.Save(pubPath, secPath, []byte("abcDEFghi"))
 	if err != nil {
-		t.Error("Could not generate a Crypt4gh key-pair", err)
+		t.Error("Could not save a Crypt4gh key-pair to file", err)
 	}
 
 	_, err = KeyPairFromFiles(pubPath, secPath, []byte("abcDEFghi"))
 	if err != nil {
-		t.Error("Could not reload saved Crypt4gh key-pair", err)
+		t.Error("Could not reload the saved Crypt4gh key-pair", err)
 	}
 }

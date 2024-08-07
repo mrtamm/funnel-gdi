@@ -78,6 +78,11 @@ func encryptAndDecryptContent(rangeStart, rangeLength int) (string, error) {
 	return buffer.String(), nil
 }
 
+// Very simplified approach for encrypting some content. Good enough for testing.
+// When range is provided, an edit-list packet is added to the header so that
+// receiver would look for the part of content defined by the start position
+// and length. Specify start=0 and length=-1 to avoid the edit-list.
+// Returns the Cryp4gh formatted encrypted data with header in the buffer.
 func encryptContent(rangeStart, rangeLength int) *bytes.Buffer {
 	sharedKey := generateSharedKey()
 	aead, _ := chacha20poly1305.New(sharedKey)
@@ -138,6 +143,6 @@ func generateSharedKey() []byte {
 
 func nonce() []byte {
 	nonce := make([]byte, 12)
-	_, _ = rand.Read(nonce[:])
+	_, _ = rand.Read(nonce)
 	return nonce
 }

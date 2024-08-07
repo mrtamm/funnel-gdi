@@ -8,8 +8,8 @@ import (
 )
 
 func TestHTSGET(t *testing.T) {
-	invalidUrl := "https://google.com"
-	validUrl := "htsget://google.com"
+	invalidUrl := "https://example.org"
+	validUrl := "htsget://bearer:token@example.org"
 
 	store, err := NewHTSGET(config.HTSGETStorage{})
 	if err != nil {
