@@ -41,7 +41,7 @@ Server:
   # Server won't launch when configuration URL cannot be loaded.
   # OidcAuth:
   #   # URL of the OIDC service configuration:
-  #   ServiceConfigUrl: ""
+  #   ServiceConfigURL: ""
   #   # Client ID and secret are sent with the token introspection request
   #   # (Basic authentication):
   #   ClientId:
@@ -50,6 +50,8 @@ Server:
   #   RequireScope:
   #   # Optional: if specified, this audience value must be in the token:
   #   RequireAudience:
+  #   # The URL where OIDC should redirect after login (keep the path '/login')
+  #   RedirectURL: "http://localhost:8000/login"
 
   # Include a "Cache-Control: no-store" HTTP header in Get/List responses
   # to prevent caching by intermediary services.

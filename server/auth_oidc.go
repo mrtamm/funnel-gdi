@@ -1,12 +1,15 @@
 package server
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,13 +17,16 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/ohsu-comp-bio/funnel/config"
 	"golang.org/x/net/context"
+	"golang.org/x/oauth2"
 )
 
 // JSON structure of the OIDC configuration (only some fields)
 type OidcRemoteConfig struct {
 	Issuer                string `json:"issuer"`
 	JwksURI               string `json:"jwks_uri"`
+	AuthorizationEndpoint string `json:"authorization_endpoint"`
 	IntrospectionEndpoint string `json:"introspection_endpoint"`
+	TokenEndpoint         string `json:"token_endpoint"`
 }
 
 // JSON structure of the OIDC token introspection response (only some fields)
@@ -32,12 +38,22 @@ type IntrospectionResponse struct {
 type OidcConfig struct {
 	local  config.OidcAuth
 	remote OidcRemoteConfig
+	oauth2 oauth2.Config
 	jwks   jwk.Cache
 }
 
 func initOidcConfig(config config.OidcAuth) *OidcConfig {
-	if config.ServiceConfigUrl == "" {
+	if config.ServiceConfigURL == "" {
 		return nil
+	} else if config.ClientId == "" {
+		fmt.Printf("[ERROR] Missing configuration value [Server.OidcAuth.ClientId]")
+		os.Exit(1)
+	} else if config.ClientSecret == "" {
+		fmt.Printf("[ERROR] Missing configuration value [Server.OidcAuth.ClientSecret]")
+		os.Exit(1)
+	} else if config.RedirectURL == "" {
+		fmt.Printf("[ERROR] Missing configuration value [Server.OidcAuth.RedirectURL]")
+		os.Exit(1)
 	}
 
 	result := OidcConfig{local: config}
@@ -47,7 +63,7 @@ func initOidcConfig(config config.OidcAuth) *OidcConfig {
 
 func (c *OidcConfig) initConfig() {
 	c.remote = OidcRemoteConfig{}
-	parsedUrl := validateUrl(c.local.ServiceConfigUrl)
+	parsedUrl := validateUrl(c.local.ServiceConfigURL)
 	err := json.Unmarshal(fetchJson(parsedUrl), &c.remote)
 	if err != nil {
 		fmt.Printf("[ERROR] Failed to parse the configuration (JSON) of the "+
@@ -56,6 +72,18 @@ func (c *OidcConfig) initConfig() {
 	}
 
 	c.initJwks()
+
+	c.oauth2.ClientID = c.local.ClientId
+	c.oauth2.ClientSecret = c.local.ClientSecret
+	if c.local.RequireScope == "" {
+		c.oauth2.Scopes = []string{"openid"}
+	} else {
+		c.oauth2.Scopes = []string{"openid", c.local.RequireScope}
+	}
+	c.oauth2.RedirectURL = c.local.RedirectURL
+	c.oauth2.Endpoint.AuthStyle = oauth2.AuthStyleInParams
+	c.oauth2.Endpoint.AuthURL = c.remote.AuthorizationEndpoint
+	c.oauth2.Endpoint.TokenURL = c.remote.TokenEndpoint
 }
 
 func (c *OidcConfig) initJwks() {
@@ -66,7 +94,7 @@ func (c *OidcConfig) initJwks() {
 	c.jwks = *jwk.NewCache(ctx)
 	if err := c.jwks.Register(jwksUrl, jwk.WithMinRefreshInterval(15*time.Minute)); err != nil {
 		fmt.Printf("[ERROR] Failed to register JWKS (%s) of the OIDC service "+
-			"(%s): %s\n", jwksUrl, c.local.ServiceConfigUrl, err)
+			"(%s): %s\n", jwksUrl, c.local.ServiceConfigURL, err)
 		os.Exit(1)
 	}
 
@@ -76,9 +104,100 @@ func (c *OidcConfig) initJwks() {
 
 	if err != nil {
 		fmt.Printf("[ERROR] Failed to fetch JWKS (%s) of the OIDC service "+
-			"(%s): %s\n", jwksUrl, c.local.ServiceConfigUrl, err)
+			"(%s): %s\n", jwksUrl, c.local.ServiceConfigURL, err)
 		os.Exit(1)
 	}
+}
+
+func (c *OidcConfig) RedirectToLogin(w http.ResponseWriter, req *http.Request) {
+	authCodeURL := c.oauth2.AuthCodeURL(c.computeState(req))
+	http.Redirect(w, req, authCodeURL, http.StatusSeeOther)
+}
+
+func (c *OidcConfig) HandleAuthCode(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		http.Error(w, "Only GET method is supported.", http.StatusMethodNotAllowed)
+		return
+	}
+
+	state := req.FormValue("state")
+	if state == "" {
+		c.RedirectToLogin(w, req)
+		return
+	} else if state != c.computeState(req) {
+		msg := "Unexpected value in the 'state' query-parameter."
+		http.Error(w, msg, http.StatusBadRequest)
+		return
+	}
+
+	errorCode := req.FormValue("error")
+	errorDesc := req.FormValue("error_description")
+	if errorCode != "" && errorDesc != "" {
+		msg := "OIDC authentication flow failed [" + errorCode + "]: " + errorDesc
+		http.Error(w, msg, http.StatusInternalServerError)
+		return
+	}
+
+	code := req.FormValue("code")
+	if code == "" {
+		c.RedirectToLogin(w, req)
+		return
+	}
+
+	token, err := c.oauth2.Exchange(context.Background(), code)
+	if err != nil {
+		msg := "Failed to receive a JWT for the authorization code: " + err.Error()
+		http.Error(w, msg, http.StatusInternalServerError)
+		return
+	}
+
+	cookie := http.Cookie{}
+	cookie.Name = "jwt"
+	cookie.Value = token.AccessToken
+	cookie.Expires = token.Expiry
+	cookie.SameSite = http.SameSiteStrictMode
+	cookie.HttpOnly = true
+	cookie.Secure = req.TLS != nil
+
+	http.SetCookie(w, &cookie)
+	http.Redirect(w, req, "/", http.StatusTemporaryRedirect)
+}
+
+// Prints the JWT from the cookie value in the response body. Missing cookie
+// value results in HTTP 404 response.
+// Frontend uses this endpoint for fetching the JWT for performing API requests.
+// Frontend cannot access the cookie directly as it is HttpOnly.
+// Although the API could also obtain the JWT from the cookie, it would be
+// harder to maintain, especially in the gRPC code. Therefore, the frontend
+// uses this login-token endpoint to establish JWT first, and then provide the
+// JWT value in the Authorization header of API requests.
+func (c *OidcConfig) EchoTokenHandler(w http.ResponseWriter, req *http.Request) {
+	cookie, err := req.Cookie("jwt")
+	if err != nil || len(cookie.Value) == 0 {
+		msg := "Missing 'jwt' cookie. Please log in first."
+		http.Error(w, msg, http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Content-Length", strconv.Itoa(len(cookie.Value)))
+	w.WriteHeader(http.StatusOK)
+
+	if _, err := io.WriteString(w, cookie.Value); err != nil {
+		fmt.Println("[WARN] Failed to write a JWT cookie value to HTTP response:", err)
+	}
+}
+
+func (c *OidcConfig) computeState(req *http.Request) string {
+	str := c.local.ServiceConfigURL + ":" +
+		c.local.ClientId + ":" +
+		c.local.ClientSecret + ":" +
+		req.Header.Get("User-Agent")
+
+	hash := sha256.New()
+	hash.Write([]byte(str))
+	b := hash.Sum(nil)
+	return hex.EncodeToString(b)[:10]
 }
 
 func (c *OidcConfig) ParseJwt(jwtString string) *jwt.Token {

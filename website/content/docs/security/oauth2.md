@@ -27,9 +27,9 @@ To enable JWT authentication, specify `OidcAuth` section in your config file:
 Server:
   OidcAuth:
     # URL of the OIDC service configuration:
-    ServiceConfigUrl: "https://my.oidc.service/.well-known/openid-configuration"
+    ServiceConfigURL: "https://my.oidc.service/.well-known/openid-configuration"
 
-    # Client ID and secret are sent with the token introspection request 
+    # Client ID and secret are sent with the token introspection request
     # (Basic authentication):
     ClientId: your-client-id
     ClientSecret: your-client-secret
@@ -39,9 +39,12 @@ Server:
 
     # Optional: if specified, this audience value must be in the token:
     RequireAudience: tes-api
+
+    # The URL where OIDC should redirect after login (keep the path '/login')
+    RedirectURL: "http://localhost:8000/login"
 ```
 
-Make sure to properly protect the configuration file so that it's not readable 
+Make sure to properly protect the configuration file so that it's not readable
 by everyone:
 
 ```bash

@@ -43,7 +43,7 @@ func MergeConfigFileWithFlags(file string, flagConf config.Config) (config.Confi
 			fmt.Println("Configuration problem: RPCClient User and Password " +
 				"are undefined while Server.BasicAuth is enforced.")
 			os.Exit(1)
-		} else if conf.Server.OidcAuth.ServiceConfigUrl != "" {
+		} else if conf.Server.OidcAuth.ServiceConfigURL != "" {
 			// Generating random user/password credentials for RPC:
 			conf.RPCClient.User = randomCredential()
 			conf.RPCClient.Password = randomCredential()
