@@ -54,6 +54,9 @@ func initOidcConfig(config config.OidcAuth) *OidcConfig {
 	} else if config.RedirectURL == "" {
 		fmt.Printf("[ERROR] Missing configuration value [Server.OidcAuth.RedirectURL]")
 		os.Exit(1)
+	} else if !strings.HasSuffix(config.RedirectURL, "/login") {
+		fmt.Printf("[ERROR] Configuration value [Server.OidcAuth.RedirectURL] must end with '/login'.")
+		os.Exit(1)
 	}
 
 	result := OidcConfig{local: config}
