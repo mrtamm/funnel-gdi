@@ -57,11 +57,12 @@ type BasicCredential struct {
 }
 
 type OidcAuth struct {
-	ServiceConfigUrl string
+	ServiceConfigURL string
 	ClientId         string
 	ClientSecret     string
 	RequireScope     string
 	RequireAudience  string
+	RedirectURL      string
 }
 
 // RPCClient describes configuration for gRPC clients

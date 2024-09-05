@@ -81,28 +81,44 @@ function isDone(task) {
   return task.state === "COMPLETE" || task.state === "EXECUTOR_ERROR" || task.state === "CANCELED" || task.state === "SYSTEM_ERROR";
 }
 
-function get(url) {
-  if (!url instanceof URL) {
-    console.log("get error: expected URL object; got", url);
-    return undefined;
+const fetchOptsPromise = fetch("/login/token")
+  .then((response) => {
+    if (response.status !== 200) {
+      throw new Error("User authentication is required");
+    }
+    return response.text();
+  })
+  .then((token) => {
+    const fetchOpts = {};
+    if (token) fetchOpts.headers = { Authorization: "Bearer " + token };
+    return fetchOpts;
+  })
+  .catch((_) => (window.location.pathname = "/login"));
+
+function fetchWithPost(fetchOpts, doPost) {
+  if (!doPost) return fetchOpts;
+  return {
+    method: "POST",
+    headers: {
+      ...(fetchOpts.headers || {}),
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+    },
   };
-  var params = url.searchParams;
-  if (url.toString().includes("/v1/tasks")) {
-    params.set("view", "FULL");
+};
+
+function get(url, postJson) {
+  if (!url instanceof URL) {
+    throw new Error("Expected URL object; got: " + (typeof url));
+  } else if (url.pathname.includes("/v1/tasks")) {
+    url.searchParams.set("view", "FULL");
   }
-  //console.log("get url:", url);
-  return fetch(url.toString())
-    .then(response => response.json())
-    .then(
-      (result) => {
-        //console.log("get result:", result);
-        return result;
-      },
-      (error) => {
-        console.log("get", url.toString(), "error:", error);
-        throw error;
-      },
-    );
+
+  return fetchOptsPromise
+    .then((fetchOpts) => fetchWithPost(fetchOpts, postJson))
+    .then((fetchOpts) => fetch(url.toString(), fetchOpts))
+    .then((response) => response.json())
+    .catch((error) => console.log("get", url.toString(), "error:", error));
 };
 
 export { isDone, formatDate, formatTimestamp, elapsedTime, get };

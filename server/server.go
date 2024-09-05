@@ -67,11 +67,13 @@ func (s *Server) Serve(pctx context.Context) error {
 		return err
 	}
 
+	auth := NewAuthentication(s.BasicAuth, s.OidcAuth)
+
 	grpcServer := grpc.NewServer(
 		grpc.UnaryInterceptor(
 			grpc_middleware.ChainUnaryServer(
 				// API auth check.
-				newAuthInterceptor(s.BasicAuth, s.OidcAuth),
+				auth.Interceptor,
 				newDebugInterceptor(s.Log),
 			),
 		),
@@ -92,12 +94,16 @@ func (s *Server) Serve(pctx context.Context) error {
 
 	dashmux := http.NewServeMux()
 	dashmux.Handle("/", webdash.RootHandler())
+
 	dashfs := webdash.FileServer()
+
 	mux.Handle("/favicon.ico", dashfs)
 	mux.Handle("/manifest.json", dashfs)
 	mux.Handle("/health.html", dashfs)
 	mux.Handle("/static/", dashfs)
 	mux.Handle("/metrics", promhttp.Handler())
+	mux.HandleFunc("/login", auth.LoginHandler)
+	mux.HandleFunc("/login/token", auth.EchoTokenHandler)
 
 	mux.HandleFunc("/", func(resp http.ResponseWriter, req *http.Request) {
 		// TODO this doesnt handle all routes
