@@ -27,26 +27,24 @@ on:
   push:
 
 jobs:
+
   build:
     runs-on: ubuntu-latest
     container: quay.io/ohsu-comp-bio/slurm
     steps:
-    - name: Set up Go 1.x
-      uses: actions/setup-go@v2
-      with:
-        go-version: 1.21
-
-    - name: Check out code
-      uses: actions/checkout@v2
-
-    - name: Build
-      run: make build
-
-    - name: Store funnel
-      uses: actions/upload-artifact@v2
-      with:
-        name: funnelBin
-        path: funnel
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build
+        run: make build
+      - name: Store Funnel
+        uses: actions/upload-artifact@v4
+        with:
+          name: funnelBin
+          path: funnel
 
   compliance:
     strategy:
@@ -64,9 +62,9 @@ jobs:
       # Required to access the 'tests/mongo.config.yml' file
       # Perhaps uploading it as an artifact would be more efficient?
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: funnelBin
 
@@ -94,12 +92,12 @@ jobs:
           # https://github.com/elixir-cloud-aai/openapi-test-runner/pull/65
           # git clone https://github.com/elixir-cloud-aai/openapi-test-runner
           git clone https://github.com/ohsu-comp-bio/openapi-test-runner -b fix/create-and-filter-task
-          
+
           cd openapi-test-runner
           python3 -m venv venv
           source venv/bin/activate
           pip install -r requirements.txt
-          python setup.py install  
+          python setup.py install
           openapi-test-runner report --version "${{ matrix.version }}" --server "http://localhost:8000/"
 
       - name: Install TES compliance suite
@@ -132,4 +130,3 @@ jobs:
           repository: ohsu-comp-bio/funnel-compliance
           event: start-report
           github_pat: ${{ secrets.ACTIONS_TOKEN }}
-      
