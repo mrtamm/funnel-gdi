@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -47,14 +48,14 @@ func TestAmazonS3AnonymousGet(t *testing.T) {
 }
 
 func TestGoogleStorageAnonymousGet(t *testing.T) {
-	svc, err := storage.NewService(context.Background(), option.WithoutAuthentication())
+	svc, err := storage.NewService(context.TODO(), option.WithHTTPClient(&http.Client{}))
 	if err != nil {
 		t.Fatal("Error creating GS backend:", err)
 	}
 
 	store := &GoogleCloud{svc}
 
-	_, err = store.Get(context.Background(), "gs://gatk-test-data/1kgp/downsampled_gvcf_hg37/1kg-50-exome.txt", "_test_download/file.txt")
+	_, err = store.Get(context.Background(), "gs://uspto-pair/applications/07820856.zip", "_test_download/07820856.zip")
 	if err != nil {
 		t.Error("Error downloading file:", err)
 	}
