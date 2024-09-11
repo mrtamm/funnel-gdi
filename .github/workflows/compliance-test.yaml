@@ -23,8 +23,7 @@
 
 name: Compliance Test
 
-on:
-  push:
+on: workflow_dispatch
 
 jobs:
 
