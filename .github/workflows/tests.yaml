@@ -93,7 +93,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: funnelBin
-          path: funnel
+          path: .
       - name: Slurm Test
         run: |
           chmod +x funnel
