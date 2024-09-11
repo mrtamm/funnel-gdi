@@ -30,7 +30,7 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: funnelBin
-        path: funnel
+        path: .
 
     - name: Start Funnel
       run: |
