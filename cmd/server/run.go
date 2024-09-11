@@ -260,7 +260,7 @@ func NewServer(ctx context.Context, conf config.Config, log *logger.Logger) (*Se
 
 	return &Server{
 		Server: &server.Server{
-			RPCAddress:       conf.Server.RPCAddress(),
+			RPCAddress:       ":" + conf.Server.RPCPort,
 			HTTPPort:         conf.Server.HTTPPort,
 			BasicAuth:        conf.Server.BasicAuth,
 			OidcAuth:         conf.Server.OidcAuth,

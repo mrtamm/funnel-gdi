@@ -376,8 +376,6 @@ func (f *Funnel) StartServerInDocker(containerName, imageName string, extraArgs 
 	args = append(args, extraArgs...)
 	args = append(args, imageName, "funnel", "server", "run", "--config", "/opt/funnel_config.yml")
 
-	fmt.Println("DOCKER args:", strings.Join(args, " "))
-
 	cmd := exec.Command("docker", args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
