@@ -40,7 +40,7 @@ jobs:
     - name: Install Nextflow
       run: |
         cd ..
-        git clone https://github.com/nextflow-io/nextflow/ -b tes-update-1.1
+        git clone https://github.com/nextflow-io/nextflow/ -b v24.04.4 --depth 1
         cd nextflow
         make compile
 
