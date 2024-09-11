@@ -1,78 +1,116 @@
-name: Go
+name: Go Tests
 
-on: [ pull_request, workflow_dispatch ]
+on:
+  push:
 
 jobs:
-
   lint:
     name: lint
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-go@v5
-      with:
-        go-version-file: go.mod
-    - name: golangci-lint
-      uses: golangci/golangci-lint-action@v4
-      with:
-        version: v1.56.2
-        skip-pkg-cache: true
-        args: --skip-dirs tests --timeout 10m --verbose
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          skip-cache: true
+          args: --verbose --timeout 3m --disable-all --enable=govet --enable=gofmt --enable=goimports --enable=misspell
 
   build:
     runs-on: ubuntu-latest
     steps:
-    - name: Check out code
-      uses: actions/checkout@v4
-    - name: Set up Go 1.x
-      uses: actions/setup-go@v5
-      with:
-        go-version-file: go.mod
-    - name: Build
-      run: go build -v ./
-    - name: Store funnel
-      uses: actions/upload-artifact@v4
-      with:
-        name: funnelBin
-        path: funnel
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build
+        run: make build
+      - name: Store Funnel
+        uses: actions/upload-artifact@v4
+        with:
+          name: funnelBin
+          path: funnel
 
   unitTest:
     runs-on: ubuntu-latest
     steps:
-    - name: Check out code
-      uses: actions/checkout@v4
-    - name: Set up Go 1.x
-      uses: actions/setup-go@v5
-      with:
-        go-version-file: go.mod
-    - name: Unit Tests
-      run: make test
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Unit Tests
+        run: make test-verbose
 
   mongoTest:
     runs-on: ubuntu-latest
     needs: build
     steps:
-    - name: Check out code
-      uses: actions/checkout@v4
-    - name: Set up Go 1.x
-      uses: actions/setup-go@v5
-      with:
-        go-version-file: go.mod
-    - name: MongoTest
-      run: |
-        make start-mongodb
-        sleep 10
-        make test-mongodb
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: MongoTest
+        run: |
+          make start-mongodb
+          sleep 10
+          make test-mongodb
 
   badgerTest:
     runs-on: ubuntu-latest
     needs: build
     steps:
-    - name: Check out code
-      uses: actions/checkout@v4
-    - name: Set up Go 1.x
-      uses: actions/setup-go@v5
-      with:
-        go-version-file: go.mod
-    - name: Badger Test
-      run: make test-badger
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Badger Test
+        run: make test-badger
+
+  slurmTest:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Download funnel bin
+        uses: actions/download-artifact@v4
+        with:
+          name: funnelBin
+          path: .
+      - name: Slurm Test
+        run: |
+          chmod +x funnel
+          make test-slurm
+
+  s3Test:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: S3 Test
+        run: |
+          make start-generic-s3
+          sleep 10
+          make test-generic-s3
