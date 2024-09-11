@@ -30,7 +30,6 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    container: quay.io/ohsu-comp-bio/slurm
     steps:
       - name: Check out code
         uses: actions/checkout@v4
