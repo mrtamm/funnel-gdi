@@ -407,7 +407,6 @@ func (f *Funnel) StartServerInDocker(containerName, imageName string, extraArgs 
 	case <-ready:
 		break
 	}
-	return
 }
 
 func (f *Funnel) findTestServerContainers() []string {
@@ -439,7 +438,6 @@ func (f *Funnel) killTestServerContainers(ids []string) {
 func (f *Funnel) CleanupTestServerContainer(containerName string) {
 	f.Cleanup()
 	f.killTestServerContainers([]string{containerName})
-	return
 }
 
 // HelloWorld is a simple, valid task that is easy to reuse in tests.

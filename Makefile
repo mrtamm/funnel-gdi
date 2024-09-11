@@ -101,10 +101,12 @@ lint-depends:
 
 # Run code style and other checks
 lint:
-	@golangci-lint run --timeout 3m --disable-all --enable=govet --enable=gofmt --enable=goimports --enable=misspell \
+	@golangci-lint run --timeout 3m --disable-all \
+		--enable=gosimple --enable=govet --enable=gofmt --enable=goimports --enable=misspell \
 		--exclude-dirs "(cmd/termdash|webdash|funnel-work-dir)" \
 		./...
-	@golangci-lint run --timeout 3m --disable-all --enable=govet --enable=gofmt --enable=goimports --enable=misspell \
+	@golangci-lint run --timeout 3m --disable-all  \
+		--enable=gosimple --enable=govet --enable=gofmt --enable=goimports --enable=misspell \
 		./cmd/termdash/...
 
 # Run all tests

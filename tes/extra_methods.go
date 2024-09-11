@@ -1,7 +1,7 @@
 package tes
 
 func (x *ListTasksRequest) GetTags() map[string]string {
-	if x.TagKey == nil || len(x.TagKey) == 0 {
+	if len(x.TagKey) == 0 {
 		return nil
 	}
 	out := map[string]string{}
