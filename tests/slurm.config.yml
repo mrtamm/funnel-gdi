@@ -17,6 +17,4 @@ Slurm:
     {{printf "#SBATCH --tmp %.0fGB" .DiskGb}}
     {{- end}}
 
-    which funnel
-    funnel version
     funnel worker run --config /opt/funnel_config.yml --taskID {{.TaskId}}

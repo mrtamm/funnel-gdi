@@ -97,6 +97,7 @@ jobs:
       - name: Slurm Test
         run: |
           chmod +x funnel
+          ./funnel version
           make test-slurm
 
   s3Test:
