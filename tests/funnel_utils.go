@@ -371,7 +371,7 @@ func (f *Funnel) StartServerInDocker(containerName, imageName string, extraArgs 
 		"-p", fmt.Sprintf("%d:%d", rpcPort, rpcPort),
 		"-v", "/var/run/docker.sock:/var/run/docker.sock",
 		"-v", fmt.Sprintf("%s:/bin/funnel", funnelBinary),
-		"-v", fmt.Sprintf("%s:%s", configPath, "/opt/funnel_config.yml"),
+		"-v", fmt.Sprintf("%s:/opt/funnel_config.yml", configPath),
 	}
 	args = append(args, extraArgs...)
 	args = append(args, imageName, "funnel", "server", "run", "--config", "/opt/funnel_config.yml")
