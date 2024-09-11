@@ -35,7 +35,7 @@ build:
 	@touch version/version.go
 	@go build -ldflags '$(VERSION_LDFLAGS)' -buildvcs=false .
 
-# Build an unoptimized version of the code for use during debugging 
+# Build an unoptimized version of the code for use during debugging
 # https://go.dev/doc/gdb
 debug:
 	@go install -gcflags=all="-N -l"
@@ -101,14 +101,11 @@ lint-depends:
 
 # Run code style and other checks
 lint:
-	@golangci-lint run --timeout 3m --disable-all --enable=vet --enable=golint --enable=gofmt --enable=goimports --enable=misspell \
-		--skip-dirs "vendor" \
-		--skip-dirs "webdash" \
-		--skip-dirs "cmd/webdash" \
-		--skip-dirs "funnel-work-dir" \
-		-e '.*bundle.go' -e ".*pb.go" -e ".*pb.gw.go" \
+	@golangci-lint run --timeout 3m --disable-all --enable=govet --enable=gofmt --enable=goimports --enable=misspell \
+		--exclude-dirs "(cmd/termdash|webdash|funnel-work-dir)" \
 		./...
-	@golangci-lint run --timeout 3m --disable-all --enable=vet --enable=gofmt --enable=goimports --enable=misspell ./cmd/termdash/...
+	@golangci-lint run --timeout 3m --disable-all --enable=govet --enable=gofmt --enable=goimports --enable=misspell \
+		./cmd/termdash/...
 
 # Run all tests
 test:
@@ -236,7 +233,7 @@ docker-dind:
 docker-dind-rootless:
 	docker build -t ohsucompbio/funnel-dind-rootless:latest -f Dockerfile.dind-rootless .
 
-# Create a release on Github using GoReleaser 
+# Create a release on Github using GoReleaser
 release:
 	@go get github.com/buchanae/github-release-notes
 	@goreleaser \

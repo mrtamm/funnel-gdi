@@ -19,7 +19,7 @@ jobs:
         with:
           version: latest
           skip-cache: true
-          args: --exclude-dirs tests --timeout 3m --verbose -D unused -D errcheck -D staticcheck -D govet -D gosimple -D ineffassign
+          args: --verbose --timeout 3m --disable-all --enable=govet --enable=gofmt --enable=goimports --enable=misspell
 
   build:
     runs-on: ubuntu-latest
