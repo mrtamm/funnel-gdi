@@ -21,6 +21,8 @@ token is still active (i.e., no token invalidation before expiring).
 Optionally, Funnel can also validate the scope and audience claims to contain
 specific values.
 
+It is not possible to configure administrative users for the OAuth2 authentication mode.
+
 To enable JWT authentication, specify `OidcAuth` section in your config file:
 
 ```yaml

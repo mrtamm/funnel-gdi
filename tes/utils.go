@@ -53,6 +53,7 @@ func Base64Decode(raw string) (*Task, error) {
 
 // ErrNotFound is returned when a task is not found.
 var ErrNotFound = errors.New("task not found")
+var ErrNotPermitted = errors.New("permission denied")
 
 // Shorthand for task views
 const (

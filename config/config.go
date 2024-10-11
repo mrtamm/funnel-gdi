@@ -54,6 +54,7 @@ type Config struct {
 type BasicCredential struct {
 	User     string
 	Password string
+	Admin    bool
 }
 
 type OidcAuth struct {

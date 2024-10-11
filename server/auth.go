@@ -14,28 +14,48 @@ import (
 )
 
 type Authentication struct {
-	basic map[string]bool
-	oidc  *OidcConfig
+	basic  map[string]string
+	admins map[string]bool
+	oidc   *OidcConfig
 }
+
+// Extracted info about the current user, which is exposed through Context.
+type UserInfo struct {
+	IsPublic bool
+	IsAdmin  bool
+	Username string
+}
+
+// Context key type for storing UserInfo.
+// Note: UserInfo is not in the context when the system internally requests data.
+type userInfoContextKey string
 
 var (
 	errMissingMetadata    = status.Errorf(codes.InvalidArgument, "Missing metadata in the context")
 	errTokenRequired      = status.Errorf(codes.Unauthenticated, "Basic/Bearer authorization token missing")
-	errInvalidBasicToken  = status.Errorf(codes.Unauthenticated, "Invalid Basic authorization token")
-	errInvalidBearerToken = status.Errorf(codes.Unauthenticated, "Invalid Bearer authorization token")
+	errInvalidBasicToken  = status.Errorf(codes.Unauthenticated, "Basic-authentication failed")
+	errInvalidBearerToken = status.Errorf(codes.Unauthenticated, "Bearer authorization token not accepted")
+	publicUserInfo        = UserInfo{IsPublic: true, IsAdmin: false, Username: ""}
+	UserInfoKey           = userInfoContextKey("user-info")
 )
 
 func NewAuthentication(creds []config.BasicCredential, oidc config.OidcAuth) *Authentication {
-	basicCreds := make(map[string]bool)
+	basicCreds := make(map[string]string)
+	adminUsers := make(map[string]bool)
+
 	for _, cred := range creds {
 		credBytes := []byte(cred.User + ":" + cred.Password)
 		fullValue := "Basic " + base64.StdEncoding.EncodeToString(credBytes)
-		basicCreds[fullValue] = true
+		basicCreds[fullValue] = cred.User
+		if cred.Admin {
+			adminUsers[cred.User] = true
+		}
 	}
 
 	return &Authentication{
-		basic: basicCreds,
-		oidc:  initOidcConfig(oidc),
+		basic:  basicCreds,
+		admins: adminUsers,
+		oidc:   initOidcConfig(oidc),
 	}
 }
 
@@ -48,6 +68,7 @@ func (a *Authentication) Interceptor(
 
 	// Case when authentication is not required:
 	if len(a.basic) == 0 && a.oidc == nil {
+		ctx = context.WithValue(ctx, UserInfoKey, &publicUserInfo)
 		return handler(ctx, req)
 	}
 
@@ -67,13 +88,20 @@ func (a *Authentication) Interceptor(
 	if strings.HasPrefix(values[0], "Basic ") {
 		authErr = errInvalidBasicToken
 		headerValue := values[0]
-		authorized = a.basic[headerValue]
-	} else if a.oidc != nil {
-		if strings.HasPrefix(values[0], "Bearer ") {
-			authErr = errInvalidBearerToken
-			jwtString := strings.TrimPrefix(values[0], "Bearer ")
-			jwt := a.oidc.ParseJwt(jwtString)
-			authorized = jwt != nil
+		username := a.basic[headerValue]
+		isAdmin := a.admins[username]
+		authorized = username != ""
+
+		if authorized {
+			ctx = context.WithValue(ctx, UserInfoKey, &UserInfo{Username: username, IsAdmin: isAdmin})
+		}
+	} else if a.oidc != nil && strings.HasPrefix(values[0], "Bearer ") {
+		authErr = errInvalidBearerToken
+		jwtString := strings.TrimPrefix(values[0], "Bearer ")
+		subject := a.oidc.ParseJwtSubject(jwtString)
+		authorized = subject != ""
+		if authorized {
+			ctx = context.WithValue(ctx, UserInfoKey, &UserInfo{Username: subject})
 		}
 	}
 
@@ -115,7 +143,7 @@ func (a *Authentication) EchoTokenHandler(w http.ResponseWriter, req *http.Reque
 
 func (a *Authentication) handleBasicAuth(w http.ResponseWriter, req *http.Request) {
 	// Check if provided value in the header is valid:
-	if a.basic[req.Header.Get("Authorization")] {
+	if a.basic[req.Header.Get("Authorization")] == "" {
 		http.Redirect(w, req, "/", http.StatusSeeOther)
 	} else {
 		w.Header().Set("WWW-Authenticate", "Basic realm=Funnel")
@@ -123,4 +151,13 @@ func (a *Authentication) handleBasicAuth(w http.ResponseWriter, req *http.Reques
 			"username and password)"
 		http.Error(w, msg, http.StatusUnauthorized)
 	}
+}
+
+// Reports whether current user can access data with the specified owner.
+// Admin-user can access everything.
+// Non-authenticated users can access data without ownership.
+// Authenticated users can access only the data that was created by the same user.
+func (u *UserInfo) IsAccessible(dataOwner string) bool {
+	result := u.IsAdmin || u.IsPublic && dataOwner == "" || !u.IsPublic && dataOwner == u.Username
+	return result
 }

@@ -32,6 +32,9 @@ Server:
   # If used, make sure to properly restrict access to the config file
   # (e.g. chmod 600 funnel.config.yml)
   # BasicAuth:
+  #   - User: admin
+  #     Password: oejf023moq
+  #     Admin: true
   #   - User: user1
   #     Password: abc123
   #   - User: user2

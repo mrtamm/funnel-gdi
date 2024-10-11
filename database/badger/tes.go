@@ -1,10 +1,12 @@
 package badger
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 
 	badger "github.com/dgraph-io/badger/v2"
+	"github.com/ohsu-comp-bio/funnel/server"
 	"github.com/ohsu-comp-bio/funnel/tes"
 	"google.golang.org/protobuf/proto"
 )
@@ -14,7 +16,7 @@ func (db *Badger) GetTask(ctx context.Context, req *tes.GetTaskRequest) (*tes.Ta
 	var task *tes.Task
 
 	err := db.db.View(func(txn *badger.Txn) error {
-		t, err := db.getTask(txn, req.Id)
+		t, err := getTask(txn, req.Id, ctx)
 		task = t
 		return err
 	})
@@ -60,6 +62,14 @@ func (db *Badger) ListTasks(ctx context.Context, req *tes.ListTasksRequest) (*te
 
 	taskLoop:
 		for ; it.Valid() && len(tasks) < pageSize; it.Next() {
+			if !it.Valid() || !bytes.HasPrefix(it.Item().Key(), taskKeyPrefix) {
+				break
+			}
+
+			if !isAccessible(txn, ownerKeyFromTaskKey(it.Item().Key()), ctx) {
+				continue
+			}
+
 			var val []byte
 			err := it.Item().Value(func(d []byte) error {
 				val = copyBytes(d)
@@ -118,7 +128,11 @@ func (db *Badger) ListTasks(ctx context.Context, req *tes.ListTasksRequest) (*te
 	return &out, nil
 }
 
-func (db *Badger) getTask(txn *badger.Txn, id string) (*tes.Task, error) {
+func getTask(txn *badger.Txn, id string, ctx context.Context) (*tes.Task, error) {
+	if !isAccessible(txn, ownerKey(id), ctx) {
+		return nil, tes.ErrNotPermitted
+	}
+
 	item, err := txn.Get(taskKey(id))
 	if err == badger.ErrKeyNotFound {
 		return nil, tes.ErrNotFound
@@ -142,6 +156,23 @@ func (db *Badger) getTask(txn *badger.Txn, id string) (*tes.Task, error) {
 		return nil, fmt.Errorf("unmarshaling data: %s", err)
 	}
 	return task, nil
+}
+
+func isAccessible(txn *badger.Txn, ownerKey []byte, ctx context.Context) bool {
+	userInfo, ok := ctx.Value(server.UserInfoKey).(*server.UserInfo)
+	if !ok || userInfo.IsAdmin {
+		return true
+	}
+
+	owner := ""
+	if item, err := txn.Get(ownerKey); err == nil {
+		_ = item.Value(func(d []byte) error {
+			owner = string(d)
+			return nil
+		})
+	}
+
+	return userInfo.IsAccessible(owner)
 }
 
 func copyBytes(in []byte) []byte {

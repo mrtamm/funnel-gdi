@@ -1,13 +1,18 @@
 package elastic
 
 import (
+	"encoding/json"
 	"fmt"
 
+	"github.com/ohsu-comp-bio/funnel/server"
 	"github.com/ohsu-comp-bio/funnel/tes"
 	"golang.org/x/net/context"
-	"google.golang.org/protobuf/encoding/protojson"
 	elastic "gopkg.in/olivere/elastic.v5"
 )
+
+type TaskOwner struct {
+	Owner string `json:"owner"`
+}
 
 func (es *Elastic) getTask(ctx context.Context, req *tes.GetTaskRequest) (*elastic.GetResult, error) {
 	g := es.client.Get().
@@ -17,15 +22,24 @@ func (es *Elastic) getTask(ctx context.Context, req *tes.GetTaskRequest) (*elast
 
 	switch req.View {
 	case tes.TaskView_BASIC:
-		g = g.FetchSource(true).FetchSourceContext(basic)
+		g = g.FetchSourceContext(basic)
 	case tes.TaskView_MINIMAL:
-		g = g.FetchSource(true).FetchSourceContext(minimal)
+		g = g.FetchSourceContext(minimal)
 	}
 
 	res, err := g.Do(ctx)
 	if elastic.IsNotFound(err) {
 		return nil, tes.ErrNotFound
 	}
+
+	if userInfo, ok := ctx.Value(server.UserInfoKey).(*server.UserInfo); err == nil && ok && !userInfo.IsAdmin {
+		var partial TaskOwner
+		_ = json.Unmarshal(*res.Source, &partial)
+		if !userInfo.IsAccessible(partial.Owner) {
+			return nil, tes.ErrNotPermitted
+		}
+	}
+
 	return res, err
 }
 
@@ -35,14 +49,11 @@ func (es *Elastic) GetTask(ctx context.Context, req *tes.GetTaskRequest) (*tes.T
 	if err != nil {
 		return nil, err
 	}
-	task := &tes.Task{}
-	err = protojson.Unmarshal(*res.Source, task)
-	return task, err
+	return unmarshalTask(*res.Source)
 }
 
 // ListTasks lists tasks, duh.
 func (es *Elastic) ListTasks(ctx context.Context, req *tes.ListTasksRequest) (*tes.ListTasksResponse, error) {
-
 	pageSize := tes.GetPageSize(req.GetPageSize())
 	q := es.client.Search().
 		Index(es.taskIndex).
@@ -53,6 +64,15 @@ func (es *Elastic) ListTasks(ctx context.Context, req *tes.ListTasksRequest) (*t
 	}
 
 	filterParts := []elastic.Query{}
+
+	if userInfo, ok := ctx.Value(server.UserInfoKey).(*server.UserInfo); ok && !userInfo.IsAdmin {
+		if userInfo.Username == "" {
+			filterParts = append(filterParts, elastic.NewBoolQuery().MustNot(elastic.NewExistsQuery("owner")))
+		} else {
+			filterParts = append(filterParts, elastic.NewTermQuery("owner", userInfo.Username))
+		}
+	}
+
 	if req.State != tes.Unknown {
 		filterParts = append(filterParts, elastic.NewTermQuery("state", req.State.String()))
 	}
@@ -69,9 +89,9 @@ func (es *Elastic) ListTasks(ctx context.Context, req *tes.ListTasksRequest) (*t
 
 	switch req.View {
 	case tes.TaskView_BASIC:
-		q = q.FetchSource(true).FetchSourceContext(basic)
+		q = q.FetchSourceContext(basic)
 	case tes.TaskView_MINIMAL:
-		q = q.FetchSource(true).FetchSourceContext(minimal)
+		q = q.FetchSourceContext(minimal)
 	}
 
 	res, err := q.Do(ctx)
@@ -81,8 +101,7 @@ func (es *Elastic) ListTasks(ctx context.Context, req *tes.ListTasksRequest) (*t
 
 	resp := &tes.ListTasksResponse{}
 	for i, hit := range res.Hits.Hits {
-		t := &tes.Task{}
-		err := protojson.Unmarshal(*hit.Source, t)
+		t, err := unmarshalTask(*hit.Source)
 		if err != nil {
 			return nil, err
 		}
