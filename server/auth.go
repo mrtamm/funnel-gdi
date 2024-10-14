@@ -21,9 +21,17 @@ type Authentication struct {
 
 // Extracted info about the current user, which is exposed through Context.
 type UserInfo struct {
+	// Public users are non-authenticated, in case Funnel configuration does
+	// not require OIDC nor Basic authentication.
 	IsPublic bool
-	IsAdmin  bool
+	// Administrator is a Basic-authentication user with `Admin: true` property
+	// in the configuration file.
+	IsAdmin bool
+	// Username of an authenticated user (subject field from JWT).
 	Username string
+	// In case of OIDC authentication, the provided Bearer token, which can be
+	// used when requesting task input data.
+	Token string
 }
 
 // Context key type for storing UserInfo.
@@ -101,7 +109,7 @@ func (a *Authentication) Interceptor(
 		subject := a.oidc.ParseJwtSubject(jwtString)
 		authorized = subject != ""
 		if authorized {
-			ctx = context.WithValue(ctx, UserInfoKey, &UserInfo{Username: subject})
+			ctx = context.WithValue(ctx, UserInfoKey, &UserInfo{Username: subject, Token: jwtString})
 		}
 	}
 
