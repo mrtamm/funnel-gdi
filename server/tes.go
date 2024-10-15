@@ -1,7 +1,9 @@
 package server
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/ohsu-comp-bio/funnel/events"
 	"github.com/ohsu-comp-bio/funnel/logger"
@@ -33,9 +35,12 @@ type TaskService struct {
 // CreateTask provides an HTTP/gRPC endpoint for creating a task.
 // This is part of the TES implementation.
 func (ts *TaskService) CreateTask(ctx context.Context, task *tes.Task) (*tes.CreateTaskResponse, error) {
-
 	if err := tes.InitTask(task, true); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, err.Error())
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	if err := ReplaceInputBearerToken(ctx, task); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	if err := ts.Event.WriteEvent(ctx, events.NewTaskCreated(task)); err != nil {
@@ -108,4 +113,26 @@ func (ts *TaskService) GetServiceInfo(ctx context.Context, info *tes.ServiceInfo
 	}
 
 	return resp, nil
+}
+
+func ReplaceInputBearerToken(ctx context.Context, task *tes.Task) error {
+	userInfo, ok := ctx.Value(UserInfoKey).(*UserInfo)
+	noToken := !ok || userInfo.Token == ""
+
+	for _, input := range task.Inputs {
+		pos := strings.Index(input.Url, "://bearer:$token@")
+		if pos < 2 {
+			continue
+		}
+		if noToken {
+			return errors.New("Task input expects the Bearer token of the " +
+				"request to be used for fetching the data, however, " +
+				"authentication-context has no information about the token " +
+				"to use. Please use explicit Bearer token value instead of " +
+				"'$token'.")
+		}
+		input.Url = input.Url[:pos+10] + userInfo.Token + input.Url[pos+16:]
+	}
+
+	return nil
 }
