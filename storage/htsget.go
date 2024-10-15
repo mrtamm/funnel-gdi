@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	urllib "net/url"
 	"os"
 	"strings"
 	"time"
@@ -56,10 +57,13 @@ func (b *HTSGET) Put(ctx context.Context, url, path string) (*Object, error) {
 // If configuration specifies sending a public key, the received content will
 // be also decrypted locally before writing to the file.
 func (b *HTSGET) Get(ctx context.Context, url, path string) (*Object, error) {
-	httpsUrl, token := htsgetUrl(url, b.conf.Protocol)
+	httpsUrl, cleanHtsgetUrl, token, err := htsgetUrl(url, b.conf.Protocol)
+	if err != nil {
+		return nil, err
+	}
 
 	client := htsget.NewHtsgetClient(httpsUrl, token, time.Duration(b.conf.Timeout))
-	err := client.DownloadTo(path)
+	err = client.DownloadTo(path)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +75,7 @@ func (b *HTSGET) Get(ctx context.Context, url, path string) (*Object, error) {
 	}
 
 	return &Object{
-		URL:          url,
+		URL:          cleanHtsgetUrl,
 		Name:         path,
 		Size:         info.Size(),
 		LastModified: info.ModTime(),
@@ -101,23 +105,30 @@ func (b *HTSGET) supportsPrefix(url string) error {
 	return nil
 }
 
-func htsgetUrl(url, useProtocol string) (updatedUrl string, token string) {
+func htsgetUrl(url, useProtocol string) (httpsUrl string, cleanHtsgetUrl string, token string, err error) {
 	if useProtocol == "" {
 		useProtocol = "https"
 	}
-	useProtocol += "://"
-	updatedUrl = strings.Replace(url, protocolPrefix, useProtocol, 1)
 
-	// Optional info: parse the "token" from "htsget://bearer:token@host..."
-	if strings.HasPrefix(url, protocolBearer) {
-		bearerStart := len(protocolBearer)
-		bearerStop := strings.Index(url, "@")
-
-		if bearerStop > bearerStart {
-			updatedUrl = useProtocol + url[bearerStop+1:]
-			token = url[bearerStart:bearerStop]
-		}
+	u, err := urllib.Parse(url)
+	if err != nil {
+		return
 	}
 
-	return updatedUrl, token
+	// Extract and remove the "bearer" token:
+	if u.User != nil && u.User.Username() == "bearer" {
+		token, _ = u.User.Password()
+		u.User = nil
+	}
+
+	// HTTPS URL just uses the "https" scheme:
+	u.Scheme = useProtocol
+	httpsUrl = u.String()
+
+	// Clean HTSGET URL discards its user-info and uses the "htsget" scheme:
+	u.Scheme = "htsget"
+	u.User = nil
+	cleanHtsgetUrl = u.String()
+
+	return httpsUrl, cleanHtsgetUrl, token, nil
 }
