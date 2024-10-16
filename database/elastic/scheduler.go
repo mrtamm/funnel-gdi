@@ -31,8 +31,7 @@ func (es *Elastic) ReadQueue(n int) []*tes.Task {
 
 	var tasks []*tes.Task
 	for _, hit := range res.Hits.Hits {
-		t := &tes.Task{}
-		err := protojson.Unmarshal(*hit.Source, t)
+		t, err := unmarshalTask(*hit.Source)
 		if err != nil {
 			continue
 		}

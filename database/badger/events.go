@@ -7,6 +7,7 @@ import (
 
 	badger "github.com/dgraph-io/badger/v2"
 	"github.com/ohsu-comp-bio/funnel/events"
+	"github.com/ohsu-comp-bio/funnel/server"
 	"github.com/ohsu-comp-bio/funnel/tes"
 	"github.com/ohsu-comp-bio/funnel/util"
 	"google.golang.org/protobuf/proto"
@@ -54,11 +55,18 @@ func (db *Badger) writeEvent(ctx context.Context, req *events.Event) error {
 				return fmt.Errorf("marshaling task to bytes: %s", err)
 			}
 
+			if userInfo, ok := ctx.Value(server.UserInfoKey).(*server.UserInfo); ok && userInfo.Username != "" {
+				err = txn.Set(ownerKey(task.Id), []byte(userInfo.Username))
+				if err != nil {
+					return fmt.Errorf("storing owner info: %s", err)
+				}
+			}
+
 			return txn.Set(taskKey(task.Id), val)
 		}
 
 		// The rest of the events below all update a task, so we need to make sure it exists.
-		task, err := db.getTask(txn, req.Id)
+		task, err := getTask(txn, req.Id, ctx)
 		if err != nil {
 			return err
 		}

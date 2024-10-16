@@ -203,11 +203,11 @@ func (c *OidcConfig) computeState(req *http.Request) string {
 	return hex.EncodeToString(b)[:10]
 }
 
-func (c *OidcConfig) ParseJwt(jwtString string) *jwt.Token {
+func (c *OidcConfig) ParseJwtSubject(jwtString string) string {
 	keySet, err := c.jwks.Get(context.Background(), c.remote.JwksURI)
 	if err != nil {
 		fmt.Printf("[WARN] Failed to retrieve JWKS key-set: %s", err)
-		return nil
+		return ""
 	}
 
 	token, err := jwt.ParseString(
@@ -219,14 +219,14 @@ func (c *OidcConfig) ParseJwt(jwtString string) *jwt.Token {
 
 	if err != nil {
 		fmt.Printf("[WARN] Provided JWT is not valid: %s.\n", err)
-		return nil
+		return ""
 	}
 
 	if !c.isJwtValid(&token) || !c.isJwtActive(jwtString) {
-		return nil
+		return ""
 	}
 
-	return &token
+	return token.Subject()
 }
 
 func (c *OidcConfig) isJwtValid(token *jwt.Token) bool {

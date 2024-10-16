@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/ohsu-comp-bio/funnel/events"
+	"github.com/ohsu-comp-bio/funnel/server"
 	"github.com/ohsu-comp-bio/funnel/tes"
 	"github.com/ohsu-comp-bio/funnel/util"
-	"google.golang.org/protobuf/encoding/protojson"
 	elastic "gopkg.in/olivere/elastic.v5"
 )
 
@@ -90,27 +90,34 @@ func (es *Elastic) WriteEvent(ctx context.Context, ev *events.Event) error {
 	switch ev.Type {
 	case events.Type_TASK_CREATED:
 		task := ev.GetTask()
-		mar := protojson.MarshalOptions{}
-		b, err := mar.Marshal(task)
+		b, err := marshalTask(task)
 		if err != nil {
 			return err
 		}
 
-		_, err = es.client.Index().
+		res, err := es.client.Index().
 			Index(es.taskIndex).
 			Type("task").
 			Id(task.Id).
 			BodyString(string(b)).
 			Do(ctx)
+
+		if userInfo, ok := ctx.Value(server.UserInfoKey).(*server.UserInfo); err == nil && ok && userInfo.Username != "" {
+			_, err = es.client.Update().
+				Index(res.Index).
+				Type(res.Type).
+				Id(res.Id).
+				Version(res.Version).
+				Doc(map[string]string{"owner": userInfo.Username}).
+				Do(ctx)
+		}
+
 		return err
 
 	case events.Type_TASK_STATE:
 		retrier := util.NewRetrier()
 		retrier.ShouldRetry = func(err error) bool {
-			if elastic.IsConflict(err) || elastic.IsConnErr(err) {
-				return true
-			}
-			return false
+			return elastic.IsConflict(err) || elastic.IsConnErr(err)
 		}
 
 		return retrier.Retry(ctx, func() error {
@@ -120,8 +127,7 @@ func (es *Elastic) WriteEvent(ctx context.Context, ev *events.Event) error {
 				return err
 			}
 
-			task := &tes.Task{}
-			err = protojson.Unmarshal(*res.Source, task)
+			task, err := unmarshalTask(*res.Source)
 			if err != nil {
 				return err
 			}

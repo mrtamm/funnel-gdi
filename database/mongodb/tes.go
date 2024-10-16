@@ -5,6 +5,7 @@ import (
 
 	"github.com/globalsign/mgo"
 	"github.com/globalsign/mgo/bson"
+	"github.com/ohsu-comp-bio/funnel/server"
 	"github.com/ohsu-comp-bio/funnel/tes"
 	"golang.org/x/net/context"
 )
@@ -25,7 +26,16 @@ func (db *MongoDB) GetTask(ctx context.Context, req *tes.GetTaskRequest) (*tes.T
 	var task tes.Task
 	var q *mgo.Query
 
-	q = db.tasks(sess).Find(bson.M{"id": req.Id})
+	query := bson.M{"id": req.Id}
+	if userInfo, ok := ctx.Value(server.UserInfoKey).(*server.UserInfo); ok && !userInfo.IsAdmin {
+		if userInfo.Username == "" {
+			query["owner"] = bson.M{"$exists": false}
+		} else {
+			query["owner"] = userInfo.Username
+		}
+	}
+
+	q = db.tasks(sess).Find(query)
 	switch req.View {
 	case tes.TaskView_BASIC:
 		q = q.Select(basicView)
@@ -56,6 +66,14 @@ func (db *MongoDB) ListTasks(ctx context.Context, req *tes.ListTasksRequest) (*t
 	var err error
 	if req.PageToken != "" {
 		query["id"] = bson.M{"$lt": req.PageToken}
+	}
+
+	if userInfo, ok := ctx.Value(server.UserInfoKey).(*server.UserInfo); ok && !userInfo.IsAdmin {
+		if userInfo.Username == "" {
+			query["owner"] = bson.M{"$exists": false}
+		} else {
+			query["owner"] = userInfo.Username
+		}
 	}
 
 	if req.State != tes.Unknown {

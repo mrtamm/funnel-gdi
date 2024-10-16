@@ -19,6 +19,9 @@ var TaskBucket = []byte("tasks")
 // task ID -> nil
 var TasksQueued = []byte("tasks-queued")
 
+// TaskOwner maps: task ID -> owner string
+var TaskOwner = []byte("tasks-owner")
+
 // TaskState maps: task ID -> state string
 var TaskState = []byte("tasks-state")
 
@@ -71,6 +74,7 @@ func (taskBolt *BoltDB) Init() error {
 	return taskBolt.db.Update(func(tx *bolt.Tx) error {
 		ensureBucket(tx, TaskBucket)
 		ensureBucket(tx, TasksQueued)
+		ensureBucket(tx, TaskOwner)
 		ensureBucket(tx, TaskState)
 		ensureBucket(tx, TasksLog)
 		ensureBucket(tx, ExecutorLogs)

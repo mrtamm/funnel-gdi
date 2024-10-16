@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/boltdb/bolt"
+	"github.com/ohsu-comp-bio/funnel/server"
 	"github.com/ohsu-comp-bio/funnel/tes"
 	"golang.org/x/net/context"
 	"google.golang.org/protobuf/proto"
@@ -127,7 +128,10 @@ func (taskBolt *BoltDB) GetTask(ctx context.Context, req *tes.GetTaskRequest) (*
 	var err error
 
 	err = taskBolt.db.View(func(tx *bolt.Tx) error {
-		task, err = getTaskView(tx, req.Id, req.View)
+		err = checkOwner(tx, req.Id, ctx)
+		if err == nil {
+			task, err = getTaskView(tx, req.Id, req.View)
+		}
 		return err
 	})
 	return task, err
@@ -180,7 +184,13 @@ func (taskBolt *BoltDB) ListTasks(ctx context.Context, req *tes.ListTasksRequest
 
 	taskLoop:
 		for ; k != nil && i < pageSize; k, _ = c.Prev() {
-			task, _ := getTaskView(tx, string(k), view)
+			taskId := string(k)
+
+			if checkOwner(tx, taskId, ctx) != nil {
+				continue
+			}
+
+			task, _ := getTaskView(tx, taskId, view)
 
 			if req.State != tes.Unknown && req.State != task.State {
 				continue taskLoop
@@ -216,4 +226,22 @@ func (taskBolt *BoltDB) ListTasks(ctx context.Context, req *tes.ListTasksRequest
 	}
 
 	return &out, nil
+}
+
+func checkOwner(tx *bolt.Tx, taskId string, ctx context.Context) error {
+	userInfo, ok := ctx.Value(server.UserInfoKey).(*server.UserInfo)
+	if !ok || userInfo.IsAdmin {
+		return nil
+	}
+
+	ownerBytes := tx.Bucket(TaskOwner).Get([]byte(taskId))
+	taskOwner := ""
+	if len(ownerBytes) > 0 {
+		taskOwner = string(ownerBytes)
+	}
+
+	if userInfo.IsAccessible(taskOwner) {
+		return nil
+	}
+	return tes.ErrNotPermitted
 }

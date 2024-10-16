@@ -8,6 +8,7 @@ import (
 	"github.com/globalsign/mgo"
 	"github.com/globalsign/mgo/bson"
 	"github.com/ohsu-comp-bio/funnel/events"
+	"github.com/ohsu-comp-bio/funnel/server"
 	"github.com/ohsu-comp-bio/funnel/tes"
 	"github.com/ohsu-comp-bio/funnel/util"
 )
@@ -29,7 +30,15 @@ func (db *MongoDB) WriteEvent(ctx context.Context, req *events.Event) error {
 				Logs: []*tes.ExecutorLog{},
 			},
 		}
-		return tasks.Insert(&task)
+
+		err := tasks.Insert(&task)
+
+		if userInfo, ok := ctx.Value(server.UserInfoKey).(*server.UserInfo); ok && err == nil && userInfo.Username != "" {
+			updateOwner := bson.M{"$set": bson.M{"owner": userInfo.Username}}
+			err = tasks.Update(bson.M{"id": req.Id}, updateOwner)
+		}
+
+		return err
 
 	case events.Type_TASK_STATE:
 		retrier := util.NewRetrier()

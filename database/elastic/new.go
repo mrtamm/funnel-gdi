@@ -2,15 +2,19 @@ package elastic
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/ohsu-comp-bio/funnel/config"
+	"github.com/ohsu-comp-bio/funnel/tes"
+	"google.golang.org/protobuf/encoding/protojson"
 	elastic "gopkg.in/olivere/elastic.v5"
 )
 
-var minimal = elastic.NewFetchSourceContext(true).Include("id", "state")
+var minimal = elastic.NewFetchSourceContext(true).Include("id", "state", "owner")
 var basic = elastic.NewFetchSourceContext(true).
 	Exclude("logs.logs.stderr", "logs.logs.stdout", "inputs.content", "logs.system_logs")
+var unmarshalOpts = protojson.UnmarshalOptions{DiscardUnknown: true}
 
 // Elastic provides an elasticsearch database server backend.
 type Elastic struct {
@@ -69,21 +73,24 @@ func (es *Elastic) Init() error {
 	taskMappings := `{
     "mappings": {
       "task":{
-        "properties":{
-          "id": {
-            "type": "keyword"
-          },
-          "state": {
-            "type": "keyword"
-          },
-          "inputs": {
-            "type": "nested"
-          },
-          "logs": {
-            "type": "nested",
-            "properties": {
-              "logs": {
-                "type": "nested"
+      "properties":{
+        "id": {
+          "type": "keyword"
+        },
+        "state": {
+          "type": "keyword"
+        },
+        "owner": {
+          "type": "keyword"
+        },
+        "inputs": {
+          "type": "nested"
+        },
+        "logs": {
+          "type": "nested",
+          "properties": {
+            "logs": {
+              "type": "nested"
               }
             }
           }
@@ -98,4 +105,14 @@ func (es *Elastic) Init() error {
 		return err
 	}
 	return nil
+}
+
+func marshalTask(task *tes.Task) ([]byte, error) {
+	return protojson.Marshal(task)
+}
+
+func unmarshalTask(msg json.RawMessage) (*tes.Task, error) {
+	t := &tes.Task{}
+	err := unmarshalOpts.Unmarshal(msg, t)
+	return t, err
 }

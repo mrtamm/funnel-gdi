@@ -7,6 +7,7 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/ohsu-comp-bio/funnel/events"
+	"github.com/ohsu-comp-bio/funnel/server"
 	"github.com/ohsu-comp-bio/funnel/tes"
 	"google.golang.org/protobuf/proto"
 )
@@ -38,6 +39,11 @@ func (taskBolt *BoltDB) WriteEvent(ctx context.Context, req *events.Event) error
 		err = taskBolt.db.Update(func(tx *bolt.Tx) error {
 			if err := tx.Bucket(TaskBucket).Put(idBytes, taskBytes); err != nil {
 				return err
+			}
+			if userInfo, ok := ctx.Value(server.UserInfoKey).(*server.UserInfo); ok && userInfo.Username != "" {
+				if err := tx.Bucket(TaskOwner).Put(idBytes, []byte(userInfo.Username)); err != nil {
+					return err
+				}
 			}
 			return tx.Bucket(TaskState).Put(idBytes, []byte(tes.State_QUEUED.String()))
 		})
