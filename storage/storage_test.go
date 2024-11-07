@@ -21,7 +21,8 @@ func TestStorageWithConfig(t *testing.T) {
 		Swift:         config.SwiftStorage{Disabled: true},
 		HTTPStorage:   config.HTTPStorage{Disabled: true},
 		FTPStorage:    config.FTPStorage{Disabled: true},
-		HTSGETStorage: config.HTSGETStorage{Disabled: true},
+		HTSGETStorage: config.HTSGETStorage{},
+		SDAStorage:    config.SDAStorage{},
 	}
 
 	sc, err := NewMux(c)
@@ -66,7 +67,8 @@ func TestStorageWithConfig(t *testing.T) {
 			RegionName: "fakeregion",
 		},
 		HTTPStorage:   config.HTTPStorage{Disabled: false},
-		HTSGETStorage: config.HTSGETStorage{Disabled: true},
+		HTSGETStorage: config.HTSGETStorage{},
+		SDAStorage:    config.SDAStorage{},
 	}
 	sc, err = NewMux(c)
 	if err != nil {

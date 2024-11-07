@@ -1,7 +1,9 @@
 package server
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/ohsu-comp-bio/funnel/events"
 	"github.com/ohsu-comp-bio/funnel/logger"
@@ -33,9 +35,12 @@ type TaskService struct {
 // CreateTask provides an HTTP/gRPC endpoint for creating a task.
 // This is part of the TES implementation.
 func (ts *TaskService) CreateTask(ctx context.Context, task *tes.Task) (*tes.CreateTaskResponse, error) {
-
 	if err := tes.InitTask(task, true); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, err.Error())
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	if err := ReplaceInputBearerToken(ctx, task); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	if err := ts.Event.WriteEvent(ctx, events.NewTaskCreated(task)); err != nil {
@@ -108,4 +113,32 @@ func (ts *TaskService) GetServiceInfo(ctx context.Context, info *tes.ServiceInfo
 	}
 
 	return resp, nil
+}
+
+func ReplaceInputBearerToken(ctx context.Context, task *tes.Task) error {
+	userInfo, ok := ctx.Value(UserInfoKey).(*UserInfo)
+	noToken := !ok || userInfo.Token == ""
+
+	for _, input := range task.Inputs {
+		if !strings.HasPrefix(input.Url, "sda://") &&
+			!strings.HasPrefix(input.Url, "htsget://") ||
+			strings.Contains(input.Url, "#") {
+			continue
+		}
+		if noToken {
+			scheme, _, _ := strings.Cut(input.Url, "://")
+			if scheme == "htsget" {
+				continue
+			}
+			return errors.New("Task input from SDA requires a Bearer token " +
+				"to be used for fetching the data, however, current " +
+				"authentication-context has no information about the token " +
+				"to use. If necessary, please provide an explicit Bearer " +
+				"token in the URL right after the hash-sign ('#'): " +
+				"sda://dataset-id/file/path#bearer-token")
+		}
+		input.Url = input.Url + "#" + userInfo.Token
+	}
+
+	return nil
 }

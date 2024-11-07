@@ -100,6 +100,14 @@ func NewMux(conf config.Config) (*Mux, error) {
 		mux.Backends = append(mux.Backends, htsget)
 	}
 
+	if conf.SDAStorage.Valid() {
+		sda, err := NewSDA(conf.SDAStorage)
+		if err != nil {
+			return mux, fmt.Errorf("failed to config SDA storage backend: %s", err)
+		}
+		mux.Backends = append(mux.Backends, sda)
+	}
+
 	return mux, nil
 }
 

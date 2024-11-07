@@ -29,30 +29,16 @@ func NewHTTP(conf config.HTTPStorage) (*HTTP, error) {
 
 // Stat returns information about the object at the given storage URL.
 func (b *HTTP) Stat(ctx context.Context, url string) (*Object, error) {
-	u, err := urllib.Parse(url)
+	resp, cleanUrl, requestURI, err := b.doRequest(ctx, "HEAD", url)
 	if err != nil {
-		return nil, fmt.Errorf("httpStorage: parsing URL: %s", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "HEAD", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("httpStorage: creating HEAD request: %s", err)
-	}
-
-	resp, err := b.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("httpStorage: executing HEAD request: %s", err)
-	}
-
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("httpStorage: HEAD request returned status code: %d", resp.StatusCode)
+		return nil, err
 	}
 
 	modtime, _ := http.ParseTime(resp.Header.Get("Last-Modified"))
 
 	return &Object{
-		URL:          url,
-		Name:         u.RequestURI(),
+		URL:          cleanUrl,
+		Name:         requestURI,
 		Size:         resp.ContentLength,
 		LastModified: modtime,
 		ETag:         resp.Header.Get("ETag"),
@@ -61,24 +47,11 @@ func (b *HTTP) Stat(ctx context.Context, url string) (*Object, error) {
 
 // Get copies a file from a given URL to the host path.
 func (b *HTTP) Get(ctx context.Context, url, path string) (*Object, error) {
-	u, err := urllib.Parse(url)
+	resp, cleanUrl, requestURI, err := b.doRequest(ctx, "GET", url)
 	if err != nil {
-		return nil, fmt.Errorf("httpStorage: parsing URL: %s", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("httpStorage: creating GET request: %s", err)
-	}
-
-	resp, err := b.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("httpStorage: executing GET request: %s", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("httpStorage: GET request returned status code: %d", resp.StatusCode)
-	}
 
 	dest, err := os.Create(path)
 	if err != nil {
@@ -98,8 +71,8 @@ func (b *HTTP) Get(ctx context.Context, url, path string) (*Object, error) {
 	modtime, _ := http.ParseTime(resp.Header.Get("Last-Modified"))
 
 	return &Object{
-		URL:          url,
-		Name:         u.RequestURI(),
+		URL:          cleanUrl,
+		Name:         requestURI,
 		Size:         resp.ContentLength,
 		LastModified: modtime,
 		ETag:         resp.Header.Get("ETag"),
@@ -141,4 +114,42 @@ func (b *HTTP) supportsPrefix(url string) error {
 		return &ErrUnsupportedProtocol{"httpStorage"}
 	}
 	return nil
+}
+
+func (b *HTTP) doRequest(ctx context.Context, method, url string) (resp *http.Response, cleanUrl string, requestURI string, err error) {
+	u, err := urllib.Parse(url)
+	if err != nil {
+		err = fmt.Errorf("httpStorage: parsing URL: %s", err)
+		return
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, url, nil)
+	if err != nil {
+		err = fmt.Errorf("httpStorage: creating %s request: %s", method, err)
+		return
+	}
+
+	if u.User != nil && u.User.Username() == "bearer" {
+		if token, ok := u.User.Password(); ok {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+		u.User = nil
+	}
+
+	resp, err = b.client.Do(req)
+	if err != nil {
+		err = fmt.Errorf("httpStorage: executing %s request: %s", method, err)
+		return
+	}
+
+	if resp.StatusCode != 200 {
+		err = fmt.Errorf("httpStorage: %s request returned status code: %d", method, resp.StatusCode)
+		resp.Body.Close()
+		return
+	}
+
+	u.User = nil
+	cleanUrl = u.String()
+	requestURI = u.RequestURI()
+	return
 }

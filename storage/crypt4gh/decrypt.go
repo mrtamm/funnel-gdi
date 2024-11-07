@@ -14,7 +14,7 @@ import (
 
 // Handles Crypt4gh decryption context per source stream.
 type Crypt4gh struct {
-	keyPair               *Crypt4ghKeyPair
+	keyPair               *KeyPair
 	stream                io.Reader
 	headerPacketCount     uint32
 	headerPacketProcessed uint32

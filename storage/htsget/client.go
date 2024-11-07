@@ -1,6 +1,7 @@
 package htsget
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -17,47 +18,49 @@ import (
 )
 
 // The main struct for holding the data of an HTSGET client instance
-type HtsgetClient struct {
+type Client struct {
 	Timeout       time.Duration
 	Url           string
 	authorization string
-	keyPair       *crypt4gh.Crypt4ghKeyPair
+	keyPair       *crypt4gh.KeyPair
 }
 
 // JSON struct (HTSGET response) for holding an item to be fetched
-type HtsgetUrl struct {
+type Url struct {
 	Url       string            `json:"url"`
 	Headers   map[string]string `json:"headers"`
 	DataClass string            `json:"class"`
 }
 
 // JSON struct (HTSGET response) for holding items to be fetched
-type HtsgetFileInfo struct {
-	Format string      `json:"format"`
-	Urls   []HtsgetUrl `json:"urls"`
+type FileInfo struct {
+	Format    string `json:"format"`
+	Urls      []Url  `json:"urls"`
+	ErrorCode string `json:"error"`
+	ErrorMsg  string `json:"message"`
 }
 
 // Main JSON struct (HTSGET response)
-type HtsgetResponse struct {
-	FileInfo HtsgetFileInfo `json:"htsget"`
+type Response struct {
+	FileInfo FileInfo `json:"htsget"`
 }
 
 // Returns a new HTSGET client for fetching an HTSGET resource.
 // Optionally, a value can be provided for the Authorization header (in the
 // HTTP request). A timeout limit (per request) is also expected.
-func NewHtsgetClient(url, authorization string, timeout time.Duration) *HtsgetClient {
+func NewClient(url, authorization string, timeout time.Duration) *Client {
 	keys, err := crypt4gh.ResolveKeyPair()
 	if err != nil {
 		fmt.Println("[WARN] Minor issue while resolving Crypt4gh key-pair:", err)
 	}
-	return &HtsgetClient{timeout, url, authorization, keys}
+	return &Client{timeout, url, authorization, keys}
 }
 
 // Downloads the HTSGET resource (specified when the client was created) to the
 // specified local file path. This method ensures that the data gets copied to
 // the specified file, or it returns an error to indicate a failure.
-func (hc *HtsgetClient) DownloadTo(destFile string) error {
-	fileInfo, err := hc.fetchHtsgetFileInfo()
+func (hc *Client) DownloadTo(destFile string) error {
+	fileInfo, err := hc.fetchFileInfo()
 	if err != nil {
 		return err
 	}
@@ -84,7 +87,7 @@ func (hc *HtsgetClient) DownloadTo(destFile string) error {
 }
 
 // Performs the initial HTSGET request and returns the extracted JSON.
-func (hc *HtsgetClient) fetchHtsgetFileInfo() (*HtsgetFileInfo, error) {
+func (hc *Client) fetchFileInfo() (*FileInfo, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), hc.Timeout)
 	defer cancel()
 
@@ -105,15 +108,22 @@ func (hc *HtsgetClient) fetchHtsgetFileInfo() (*HtsgetFileInfo, error) {
 	}
 
 	contentType := resp.Header.Get("Content-Type")
+	body, _ := io.ReadAll(resp.Body)
+
 	if resp.StatusCode != 200 && contentType != "application/json" {
-		return nil, fmt.Errorf("Bad response from HTSGET service: "+
-			"HTTP [%d] content-type [%s]", resp.StatusCode, contentType)
+		return nil, fmt.Errorf("HTSGET service gave HTTP %d [%s] response: %s",
+			resp.StatusCode, contentType, string(body))
 	}
 
-	var parsedJson HtsgetResponse
-	err = json.NewDecoder(resp.Body).Decode(&parsedJson)
+	var parsedJson Response
+	err = json.NewDecoder(bytes.NewReader(body)).Decode(&parsedJson)
 	if err != nil {
 		return nil, err
+	}
+
+	if parsedJson.FileInfo.ErrorCode != "" {
+		return nil, fmt.Errorf("Error-response [%s] from the HTSGET service: %s",
+			parsedJson.FileInfo.ErrorCode, parsedJson.FileInfo.ErrorMsg)
 	}
 
 	if len(parsedJson.FileInfo.Urls) == 0 {
@@ -126,7 +136,7 @@ func (hc *HtsgetClient) fetchHtsgetFileInfo() (*HtsgetFileInfo, error) {
 
 // Decrypts (Crypt4gh) the temporaray file to the final file path.
 // Does not remove the temporary file.
-func (hc *HtsgetClient) decryptFile(tempFile, destFile string) error {
+func (hc *Client) decryptFile(tempFile, destFile string) error {
 	defer os.Remove(tempFile)
 
 	tempStream, err := os.Open(tempFile)
@@ -153,7 +163,7 @@ func (hc *HtsgetClient) decryptFile(tempFile, destFile string) error {
 }
 
 // Downloads parts of the HTSGET resource to a temporary file.
-func (fi *HtsgetFileInfo) downloadPartsToTempFile(timeout time.Duration) (string, error) {
+func (fi *FileInfo) downloadPartsToTempFile(timeout time.Duration) (string, error) {
 	file, err := os.CreateTemp("", "htsget.partial")
 	if err != nil {
 		return "", err
@@ -170,16 +180,19 @@ func (fi *HtsgetFileInfo) downloadPartsToTempFile(timeout time.Duration) (string
 		}
 	}
 
+	fmt.Println("[htsget] Local file ready.")
 	return file.Name(), nil
 }
 
 // Downloads or copies the current part of data to the specified file-writer.
-func (hu *HtsgetUrl) copyTo(dst io.Writer, timeout time.Duration) error {
+func (hu *Url) copyTo(dst io.Writer, timeout time.Duration) error {
 	if strings.HasPrefix(hu.Url, "data:") {
+		fmt.Println("[htsget] Appending decoded Base64-data.")
 		return hu.copyFromData(dst)
 	}
 
 	if strings.HasPrefix(hu.Url, "https:") || strings.HasPrefix(hu.Url, "http:") {
+		fmt.Println("[htsget] Appending data from URL:", hu.Url)
 		return hu.copyFromHttp(dst, timeout)
 	}
 
@@ -187,7 +200,7 @@ func (hu *HtsgetUrl) copyTo(dst io.Writer, timeout time.Duration) error {
 }
 
 // Decodes the current (BASE64) part of data to the specified file-writer.
-func (hu *HtsgetUrl) copyFromData(dst io.Writer) error {
+func (hu *Url) copyFromData(dst io.Writer) error {
 	url := hu.Url
 
 	contentSepPos := strings.Index(url, ",")
@@ -218,7 +231,7 @@ func (hu *HtsgetUrl) copyFromData(dst io.Writer) error {
 }
 
 // Downloads the current part of data (over HTTP) to the specified file-writer.
-func (hu *HtsgetUrl) copyFromHttp(dst io.Writer, timeout time.Duration) error {
+func (hu *Url) copyFromHttp(dst io.Writer, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 

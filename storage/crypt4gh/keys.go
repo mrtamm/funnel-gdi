@@ -27,14 +27,14 @@ const presumedDirName = ".c4gh"
 var base64Decoder *base64.Encoding = base64.StdEncoding.WithPadding(base64.StdPadding)
 var log = logger.NewLogger("crypt4gh", logger.DefaultConfig())
 
-type Crypt4ghKeyPair struct {
+type KeyPair struct {
 	publicKey []byte
 	secretKey []byte
 }
 
 // Produces BASE64-encoded public-key where the key is represented just as in
 // the public-key file.
-func (k *Crypt4ghKeyPair) EncodePublicKeyBase64() string {
+func (k *KeyPair) EncodePublicKeyBase64() string {
 	header, footer := getKeyFileHeaderFooter("PUBLIC")
 
 	content := bytes.NewBufferString(header)
@@ -47,7 +47,7 @@ func (k *Crypt4ghKeyPair) EncodePublicKeyBase64() string {
 
 // Saves the current key-pair to the specified files. If passphrase is not
 // empty, the private key will be encrypted using the passphrase
-func (k *Crypt4ghKeyPair) Save(publicKeyPath, privateKeyPath string, passphrase []byte) error {
+func (k *KeyPair) Save(publicKeyPath, privateKeyPath string, passphrase []byte) error {
 	err := saveKeyFile(publicKeyPath, "PUBLIC", k.publicKey)
 	if err != nil {
 		return err
@@ -63,7 +63,7 @@ func (k *Crypt4ghKeyPair) Save(publicKeyPath, privateKeyPath string, passphrase 
 
 // Wraps given reader in order to decrypt the Crypt4gh file stream (expecting
 // the header part followed by encrypted body).
-func (k *Crypt4ghKeyPair) Decrypt(r io.Reader) (io.Reader, error) {
+func (k *KeyPair) Decrypt(r io.Reader) (io.Reader, error) {
 	c := Crypt4gh{keyPair: k, stream: r}
 	err := c.readHeader()
 	return &c, err
@@ -71,7 +71,7 @@ func (k *Crypt4ghKeyPair) Decrypt(r io.Reader) (io.Reader, error) {
 
 // Returns a reader providing decrypted data for given Crypt4gh file stream
 // (body) and explicit Crypt4gh header information.
-func (k *Crypt4ghKeyPair) DecryptWithHeader(header []byte, body io.Reader) (io.Reader, error) {
+func (k *KeyPair) DecryptWithHeader(header []byte, body io.Reader) (io.Reader, error) {
 	c := Crypt4gh{keyPair: k, stream: bytes.NewReader(header)}
 	err := c.readHeader()
 	c.stream = body // After parsing header, switch to the body reader
@@ -79,13 +79,13 @@ func (k *Crypt4ghKeyPair) DecryptWithHeader(header []byte, body io.Reader) (io.R
 }
 
 // Initiates a completely new key-pair, which is stored only in memory.
-func NewKeyPair() (*Crypt4ghKeyPair, error) {
+func NewKeyPair() (*KeyPair, error) {
 	edCurve, err := ecdh.X25519().GenerateKey(rand.Reader)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Crypt4ghKeyPair{
+	return &KeyPair{
 		publicKey: edCurve.PublicKey().Bytes(),
 		secretKey: edCurve.Bytes(),
 	}, nil
@@ -99,7 +99,7 @@ func NewKeyPair() (*Crypt4ghKeyPair, error) {
 // will also result in an error.
 // Also note that when the secret key is not encrypted, the passphrase may be
 // nil or, if present, its value will be ignored.
-func KeyPairFromFiles(publicKeyPath, secretKeyPath string, passphrase []byte) (*Crypt4ghKeyPair, error) {
+func KeyPairFromFiles(publicKeyPath, secretKeyPath string, passphrase []byte) (*KeyPair, error) {
 	sec, err := parseSecretKeyFile(secretKeyPath, passphrase)
 	if err != nil {
 		return nil, err
@@ -123,7 +123,7 @@ func KeyPairFromFiles(publicKeyPath, secretKeyPath string, passphrase []byte) (*
 		}
 	}
 
-	return &Crypt4ghKeyPair{
+	return &KeyPair{
 		publicKey: pub,
 		secretKey: sec,
 	}, nil
@@ -147,7 +147,7 @@ func KeyPairFromFiles(publicKeyPath, secretKeyPath string, passphrase []byte) (*
 // and stored in the home-directory file-paths, and, on failure, in the local
 // directory file-paths. This method returns an error only when it generates
 // new keys but cannot save them to resolved paths.
-func ResolveKeyPair() (*Crypt4ghKeyPair, error) {
+func ResolveKeyPair() (*KeyPair, error) {
 	publicKeyPath := os.Getenv("C4GH_PUBLIC_KEY")
 	secretKeyPath := os.Getenv("C4GH_SECRET_KEY")
 	passphrase := []byte(os.Getenv("C4GH_PASSPHRASE"))

@@ -2,6 +2,8 @@
 package config
 
 import (
+	"fmt"
+	"net/url"
 	"os"
 
 	"github.com/ohsu-comp-bio/funnel/logger"
@@ -48,6 +50,7 @@ type Config struct {
 	HTTPStorage   HTTPStorage
 	FTPStorage    FTPStorage
 	HTSGETStorage HTSGETStorage
+	SDAStorage    SDAStorage
 }
 
 // BasicCredential describes a username and password for use with Funnel's basic auth.
@@ -394,17 +397,42 @@ func (h FTPStorage) Valid() bool {
 
 // HTSGETStorage configures the storage backend for the HTSGET protocol.
 type HTSGETStorage struct {
-	// Controls whether HTSGET storage is disabled (defaults to false)
-	Disabled bool
-	// Actual protocol for fetching the resource (defaults to 'https')
-	Protocol string
+	// Actual service used for fetching the files (e.g. 'https://some.host:8443/htsget/')
+	ServiceURL string
 	// Timeout for each HTSGET request (defaults to 30 seconds)
 	Timeout Duration
 }
 
 // Valid validates the HTSGETStorage configuration.
 func (h HTSGETStorage) Valid() bool {
-	return !h.Disabled
+	return isValidServiceUrl(h.ServiceURL)
+}
+
+// SDAStorage configures the storage backend for the SDA service.
+type SDAStorage struct {
+	// Actual service used for fetching the files (e.g. 'https://some.host:8443/sda/')
+	ServiceURL string
+	// Timeout for each SDA request (defaults to 30 seconds)
+	Timeout Duration
+}
+
+// Valid validates the SDAStorage configuration.
+func (s SDAStorage) Valid() bool {
+	return isValidServiceUrl(s.ServiceURL)
+}
+
+func isValidServiceUrl(serviceUrl string) bool {
+	if serviceUrl == "" {
+		// Service will be silently disabled.
+	} else if parsed, err := url.Parse(serviceUrl); err != nil {
+		fmt.Println("Invalid service URL [", serviceUrl, "]:", err.Error())
+	} else if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		fmt.Println("Invalid service URL [", serviceUrl, "] scheme:",
+			parsed.Scheme, "(expected 'http' or 'https')")
+	} else {
+		return true
+	}
+	return false
 }
 
 // Kubernetes describes the configuration for the Kubernetes compute backend.
