@@ -148,7 +148,7 @@ func (s *SDA) doRequest(
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	if strings.Contains(req.URL.Path, "/s3-encrypted/"); keys != nil {
+	if strings.Contains(req.URL.Path, "/s3-encrypted/") && keys != nil {
 		req.Header.Set("Client-Public-Key", keys.EncodePublicKeyBase64())
 	}
 
@@ -198,7 +198,7 @@ func toObject(resp *http.Response, path string) *Object {
 	etag := resp.Header.Get("ETag")
 
 	return &Object{
-		URL:          resp.Request.RequestURI,
+		URL:          resp.Request.URL.String(),
 		Name:         path,
 		Size:         resp.ContentLength,
 		LastModified: modtime,
