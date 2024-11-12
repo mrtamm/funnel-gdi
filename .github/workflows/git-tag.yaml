@@ -1,8 +1,10 @@
 name: Git Tag
 
 # Push events to every tag not containing '/':
-on.push.tags:
-  - "*"
+on:
+  push:
+    tags:
+      - "*"
 
 jobs:
 
